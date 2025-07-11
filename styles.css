@@ -123,7 +123,7 @@ html, body {
 
 #player-display-top {
     top: var(--ui-edge-padding);
-    left: 40%;
+    left: 41.5%;
     transform: translateX(-50%);
 }
 

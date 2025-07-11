@@ -7,11 +7,10 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <!-- NEW FEATURE: Lobby for name assignment. Initially visible. -->
     <div id="lobby-container">
-        <h2>Su Nombre</h2>
-        <input type="text" id="name-input" placeholder="Su nombre o Iniciales" maxlength="12">
-        <button id="set-name-btn">Entrar</button>
+        <h2>Enter Your Name</h2>
+        <input type="text" id="name-input" placeholder="Your Name or Initials" maxlength="12">
+        <button id="set-name-btn">Join Game</button>
     </div>
 
     <div id="canvas-container"></div>
@@ -24,19 +23,19 @@
 
         <div id="team-info"></div>
         <div id="scoreboard"></div>
-        
+        <div id="matches-won-container"></div>
+
         <div id="message-display"></div>
         <div id="game-buttons">
             <button id="playLeftBtn">Izquierda</button>
             <button id="playRightBtn">Derecha</button>
             <button id="passBtn">Paso</button>
         </div>
-        <div id="new-round-container" style="display: none;">
-            <div id="round-over-message"></div>
-            <button id="newRoundBtn">Proxima Mano</button>
-        </div>
+        <div id="new-round-container"> 
+    <div id="round-over-message"></div>
+    <button id="newRoundBtn">Start New Round</button>
+</div>
 
-        <!-- NEW FEATURE: Chat box container. -->
         <div id="chat-container">
             <div id="chat-messages"></div>
             <form id="chat-input-form">

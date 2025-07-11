@@ -15,7 +15,7 @@ app.use(express.static(__dirname));
 // == GLOBAL VARIABLES & GAME STATE MANAGEMENT                                ==
 // =============================================================================
 
-const POINTS_TO_WIN_MATCH = 10;
+const POINTS_TO_WIN_MATCH = 70;
 let jugadores = createJugadores();
 let gameState = createNewGameState(jugadores); // Pass players to the function
 
@@ -58,7 +58,7 @@ function createNewGameState() {
         endRoundMessage: null,
         matchNumber: 1,
         playerStats: initialStats,
-        lastPlayedTile: null // NEW: Track the last tile played for highlighting
+        lastPlayedTile: null
     };
 }
 
@@ -164,7 +164,7 @@ function initializeRound() {
     gameState.rightEnd = null;
     gameState.spinnerTile = null;
     gameState.endRoundMessage = null;
-    gameState.lastPlayedTile = null; // NEW: Reset for the new round.
+    gameState.lastPlayedTile = null; 
 
     const playerNames = ["Jugador 1", "Jugador 2", "Jugador 3", "Jugador 4"];
     const rotation = (gameState.matchNumber - 1) % 3;
@@ -214,17 +214,31 @@ function endRound(outcome) {
             const scoreA = gameState.teams.teamA.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
             const scoreB = gameState.teams.teamB.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
             let points;
-            if (scoreA < scoreB) { winningTeamKeyThisRound = 'teamA'; points = scoreB; } 
-            else if (scoreB < scoreA) { winningTeamKeyThisRound = 'teamB'; points = scoreA; }
-            else { winningTeamKeyThisRound = null; points = 0; endMessage = `Juego Cerrado! Empata nadie gana.`; }
-            
-            if (winningTeamKeyThisRound) {
+
+            if (scoreA !== scoreB) {
+                if (scoreA < scoreB) {
+                    winningTeamKeyThisRound = 'teamA';
+                    points = scoreB;
+                } else {
+                    winningTeamKeyThisRound = 'teamB';
+                    points = scoreA;
+                }
                 gameState.teamScores[winningTeamKeyThisRound] += points;
                 endMessage = `Juego Cerrado! Equipo ${winningTeamKeyThisRound.slice(-1)} gana con menos puntos, gana ${points} puntos.`;
+                
+                const reverseTurnOrder = { "Jugador 3": "Jugador 1", "Jugador 2": "Jugador 3", "Jugador 4": "Jugador 2", "Jugador 1": "Jugador 4" };
+                const lastPlayerWhoMoved = reverseTurnOrder[gameState.currentTurn];
+                gameState.lastWinner = lastPlayerWhoMoved;
+
+            } else {
+                winningTeamKeyThisRound = null;
+                points = 0;
+                endMessage = `Juego Cerrado! Empata nadie gana.`;
+
+                const allPipCounts = jugadores.map(p => p.isConnected ? { player: p.name, score: calculateHandValue(gameState.hands[p.name]) } : {player: p.name, score: Infinity});
+                allPipCounts.sort((a, b) => a.score - b.score);
+                if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
             }
-            const allPipCounts = jugadores.map(p => p.isConnected ? { player: p.name, score: calculateHandValue(gameState.hands[p.name]) } : {player: p.name, score: Infinity});
-            allPipCounts.sort((a, b) => a.score - b.score);
-            if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
         }
     } catch (error) { console.error("[SERVER] FATAL ERROR in endRound:", error); }
 
@@ -274,37 +288,67 @@ function checkRoundEnd() {
 
 
 // =============================================================================
-// == SOCKET.IO CONNECTION & EVENT LISTENERS                                  ==
+// == SOCKET.IO CONNECTION & EVENT LISTENERS (MODIFIED)                       ==
 // =============================================================================
 
 io.on('connection', (socket) => {
-    // --- Handle New Player Connection ---
-    const availableSlot = jugadores.find(p => !p.isConnected);
-    if (!availableSlot) {
-        socket.emit('gameError', { message: 'Game is full.' });
-        socket.disconnect();
-        return;
-    }
-    availableSlot.socketId = socket.id;
-    availableSlot.isConnected = true;
-    socket.jugadorName = availableSlot.name;
-    socket.emit('playerAssigned', availableSlot.name);
 
     socket.on('setPlayerName', (name) => {
-        const player = jugadores.find(p => p.socketId === socket.id);
-        if (player) {
-            player.assignedName = name.substring(0, 12) || player.name;
+        const displayName = name.trim().substring(0, 12);
+        if (!displayName) return;
+        
+        // --- NEW: Check if name is already used by an ACTIVE player ---
+        const nameInUse = jugadores.find(p => p.isConnected && p.assignedName && p.assignedName.trim() === displayName);
+        if (nameInUse) {
+            console.log(`[CONNECTION BLOCKED] Name "${displayName}" is already in use by an active player.`);
+            socket.emit('gameError', { message: `Name "${displayName}" is already taken. Please choose another.` });
+            return; // Stop processing
+        }
+
+        console.log(`[CONNECTION] Received setPlayerName: "${displayName}". Game initialized: ${gameState.gameInitialized}`);
+
+        // --- 1. ATTEMPT TO RECONNECT A DISCONNECTED PLAYER ---
+        const reconnectingPlayer = jugadores.find(
+            p => p.assignedName && p.assignedName.trim() === displayName && !p.isConnected && gameState.gameInitialized
+        );
+
+        if (reconnectingPlayer) {
+            console.log(`[RECONNECT] Found matching disconnected player: ${reconnectingPlayer.name}.`);
+            reconnectingPlayer.socketId = socket.id;
+            reconnectingPlayer.isConnected = true;
+            socket.jugadorName = reconnectingPlayer.name;
+            socket.emit('playerAssigned', reconnectingPlayer.name);
+
+            const playerHand = gameState.hands[reconnectingPlayer.name];
+            console.log(`[RECONNECT] Sending hand of ${playerHand ? playerHand.length : 0} tiles to ${reconnectingPlayer.name}.`);
+            io.to(socket.id).emit('playerHand', playerHand);
+
             broadcastGameState();
+            return;
+        }
+
+        console.log(`[NEW PLAYER] No reconnecting player found for "${displayName}". Treating as new.`);
+        // --- 2. IF NOT RECONNECTING, ASSIGN A NEW PLAYER SLOT ---
+        const availableSlot = jugadores.find(p => !p.isConnected);
+        if (availableSlot) {
+            availableSlot.socketId = socket.id;
+            availableSlot.isConnected = true;
+            availableSlot.assignedName = displayName;
+            socket.jugadorName = availableSlot.name;
+            socket.emit('playerAssigned', availableSlot.name);
+            console.log(`[NEW PLAYER] ${displayName} connected as ${availableSlot.name}.`);
+
+            const connectedCount = jugadores.filter(p => p.isConnected).length;
+            if (connectedCount === 4 && !gameState.gameInitialized) {
+                initializeRound();
+            } else {
+                broadcastGameState();
+            }
+        } else {
+            socket.emit('gameError', { message: 'Game is full.' });
+            socket.disconnect();
         }
     });
-
-    const connectedCount = jugadores.filter(p => p.isConnected).length;
-    if (connectedCount === 4 && !gameState.gameInitialized) {
-        gameState = createNewGameState(jugadores);
-        initializeRound();
-    } else {
-        broadcastGameState();
-    }
     
     socket.on('placeTile', ({ tile, position }) => {
         const player = socket.jugadorName;
@@ -315,7 +359,7 @@ io.on('connection', (socket) => {
         if (tileIndex === -1) return;
         
         let validMove = false;
-        let playedTileForHighlight = null; // NEW: Variable to store the tile for highlighting
+        let playedTileForHighlight = null; 
 
         if (gameState.isFirstMove) {
             if (gameState.isFirstRoundOfMatch && (tile.left !== 6 || tile.right !== 6)) {
@@ -347,7 +391,7 @@ io.on('connection', (socket) => {
         }
         if (validMove) {
             hand.splice(tileIndex, 1);
-            gameState.lastPlayedTile = playedTileForHighlight; // NEW: Set the last played tile
+            gameState.lastPlayedTile = playedTileForHighlight;
             socket.emit('playerHand', gameState.hands[player]);
             socket.emit('moveSuccess');
             nextTurn();
@@ -385,11 +429,18 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const playerSlot = jugadores.find(p => p.socketId === socket.id);
         if (playerSlot) {
-            console.log(`${playerSlot.name} (${playerSlot.assignedName}) disconnected.`);
+            console.log(`[DISCONNECTED] ${playerSlot.name} (${playerSlot.assignedName}).`);
             playerSlot.socketId = null;
             playerSlot.isConnected = false;
-            gameState = createNewGameState(jugadores);
-            broadcastGameState();
+            
+            const connectedCount = jugadores.filter(p => p.isConnected).length;
+            if (connectedCount === 0) {
+                 console.log('[SERVER] All players disconnected. Resetting game state.');
+                 jugadores = createJugadores();
+                 gameState = createNewGameState();
+            } else {
+                broadcastGameState();
+            }
         }
     });
 });

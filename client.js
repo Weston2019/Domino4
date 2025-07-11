@@ -31,7 +31,12 @@ function preload() {
     soundFormats('mp3');
     tileSound = loadSound('assets/sounds/tile_place.mp3'); 
 }
-
+/**
+ * (p5.js function) Automatically called when the browser window is resized.
+ */
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
 /**
  * (p5.js function) Runs once when the program starts.
  */
@@ -70,6 +75,8 @@ function draw() {
  * Sets up the initial name-entry lobby screen.
  */
 function setupLobby() {
+    const newRoundContainer = document.getElementById('new-round-container');
+    if (newRoundContainer) newRoundContainer.style.display = 'none';
     const lobbyContainer = document.getElementById('lobby-container');
     const nameInput = document.getElementById('name-input');
     const setNameBtn = document.getElementById('set-name-btn');
@@ -124,7 +131,18 @@ function connectToServer(playerName) {
         }
     });
 
-    socket.on('playerHand', (hand) => myPlayerHand = hand || []);
+    socket.on('playerHand', (hand) => {
+    console.log('Received "playerHand" event from server. Data:', hand);
+    if (hand && hand.length > 0) {
+        console.log(`My hand is being updated with ${hand.length} tiles.`);
+    } else {
+        console.warn('Received an empty or invalid hand.');
+    }
+    myPlayerHand = hand || [];
+});
+
+
+
     socket.on('gameError', (data) => showMessage(data.message));
     socket.on('moveSuccess', () => {
         selectedTileIndex = null;
