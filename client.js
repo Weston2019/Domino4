@@ -70,6 +70,8 @@ function draw() {
  * Sets up the initial name-entry lobby screen.
  */
 function setupLobby() {
+    const newRoundContainer = document.getElementById('new-round-container');
+    if (newRoundContainer) newRoundContainer.style.display = 'none';
     const lobbyContainer = document.getElementById('lobby-container');
     const nameInput = document.getElementById('name-input');
     const setNameBtn = document.getElementById('set-name-btn');
