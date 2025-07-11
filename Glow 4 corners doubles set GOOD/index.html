@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Dominoes</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div id="lobby-container">
+        <h2>Enter Your Name</h2>
+        <input type="text" id="name-input" placeholder="Your Name or Initials" maxlength="12">
+        <button id="set-name-btn">Join Game</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="game-ui">
+        <div id="player-display-bottom" class="player-display"></div>
+        <div id="player-display-left" class="player-display vertical-layout"></div>
+        <div id="player-display-top" class="player-display"></div>
+        <div id="player-display-right" class="player-display vertical-layout"></div>
+
+        <div id="team-info"></div>
+        <div id="scoreboard"></div>
+        <div id="matches-won-container"></div>
+
+        <div id="message-display"></div>
+        <div id="game-buttons">
+            <button id="playLeftBtn">Play Left</button>
+            <button id="playRightBtn">Play Right</button>
+            <button id="passBtn">Pass</button>
+        </div>
+        <div id="new-round-container"> 
+    <div id="round-over-message"></div>
+    <button id="newRoundBtn">Start New Round</button>
+</div>
+
+        <div id="chat-container">
+            <div id="chat-messages"></div>
+            <form id="chat-input-form">
+                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/addons/p5.sound.min.js"></script>
+    <script src="/client.js"></script>
+</body>
+</html>
