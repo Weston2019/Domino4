@@ -15,7 +15,7 @@ app.use(express.static(__dirname));
 // == GLOBAL VARIABLES & GAME STATE MANAGEMENT                                ==
 // =============================================================================
 
-const POINTS_TO_WIN_MATCH = 15;
+const POINTS_TO_WIN_MATCH = 70;
 let jugadores = createJugadores();
 let gameState = createNewGameState(jugadores); // Pass players to the function
 
