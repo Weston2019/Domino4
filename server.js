@@ -15,7 +15,7 @@ app.use(express.static(__dirname));
 // == GLOBAL VARIABLES & GAME STATE MANAGEMENT                                ==
 // =============================================================================
 
-const POINTS_TO_WIN_MATCH = 70;
+const POINTS_TO_WIN_MATCH = 10;
 let jugadores = createJugadores();
 let gameState = createNewGameState(jugadores); // Pass players to the function
 
@@ -199,12 +199,10 @@ function endRound(outcome) {
     let matchOverMessage = "";
 
     try {
-        let winningTeamKeyThisRound = null;
         if (outcome.winner) {
             const winner = outcome.winner;
             gameState.lastWinner = winner;
             const winnerTeam = gameState.teams.teamA.includes(winner) ? 'teamA' : 'teamB';
-            winningTeamKeyThisRound = winnerTeam;
             const loserTeamKey = winnerTeam === 'teamA' ? 'teamB' : 'teamA';
             const points = gameState.teams[loserTeamKey].reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
             gameState.teamScores[winnerTeam] += points;
@@ -213,28 +211,16 @@ function endRound(outcome) {
         } else if (outcome.blocked) {
             const scoreA = gameState.teams.teamA.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
             const scoreB = gameState.teams.teamB.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
-            let points;
 
             if (scoreA !== scoreB) {
-                if (scoreA < scoreB) {
-                    winningTeamKeyThisRound = 'teamA';
-                    points = scoreB;
-                } else {
-                    winningTeamKeyThisRound = 'teamB';
-                    points = scoreA;
-                }
-                gameState.teamScores[winningTeamKeyThisRound] += points;
-                endMessage = `Juego Cerrado! Equipo ${winningTeamKeyThisRound.slice(-1)} gana con menos puntos, gana ${points} puntos.`;
-                
+                const winningTeamKey = scoreA < scoreB ? 'teamA' : 'teamB';
+                const points = scoreA < scoreB ? scoreB : scoreA;
+                gameState.teamScores[winningTeamKey] += points;
+                endMessage = `Juego Cerrado! Equipo ${winningTeamKey.slice(-1)} gana con menos puntos, gana ${points} puntos.`;
                 const reverseTurnOrder = { "Jugador 3": "Jugador 1", "Jugador 2": "Jugador 3", "Jugador 4": "Jugador 2", "Jugador 1": "Jugador 4" };
-                const lastPlayerWhoMoved = reverseTurnOrder[gameState.currentTurn];
-                gameState.lastWinner = lastPlayerWhoMoved;
-
+                gameState.lastWinner = reverseTurnOrder[gameState.currentTurn];
             } else {
-                winningTeamKeyThisRound = null;
-                points = 0;
                 endMessage = `Juego Cerrado! Empata nadie gana.`;
-
                 const allPipCounts = jugadores.map(p => p.isConnected ? { player: p.name, score: calculateHandValue(gameState.hands[p.name]) } : {player: p.name, score: Infinity});
                 allPipCounts.sort((a, b) => a.score - b.score);
                 if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
@@ -248,21 +234,27 @@ function endRound(outcome) {
     if (scoreA >= POINTS_TO_WIN_MATCH || scoreB >= POINTS_TO_WIN_MATCH) {
         const winningTeamName = scoreA > scoreB ? 'Team A' : 'Team B';
         const winningTeamKey = scoreA > scoreB ? 'teamA' : 'teamB';
-        const winningPlayers = gameState.teams[winningTeamKey];
         
-        winningPlayers.forEach(playerName => {
+        gameState.teams[winningTeamKey].forEach(playerName => {
             if (gameState.playerStats[playerName]) {
                 gameState.playerStats[playerName].matchesWon++;
             }
         });
         
         matchOverMessage = `\n${winningTeamName} gana el match ${scoreA} a ${scoreB}!`;
+
+        // --- THOROUGH STATE RESET FOR NEW MATCH ---
         const savedPlayerStats = { ...gameState.playerStats };
         const nextMatchNumber = gameState.matchNumber + 1;
-        gameState.teamScores = { teamA: 0, teamB: 0 };
-        gameState.isFirstRoundOfMatch = true;
-        gameState.matchNumber = nextMatchNumber;
-        gameState.playerStats = savedPlayerStats;
+        const lastWinnerOfMatch = gameState.lastWinner; 
+
+        const newGameState = createNewGameState(); // Get a fresh state object
+        newGameState.playerStats = savedPlayerStats; // Restore persistent stats
+        newGameState.matchNumber = nextMatchNumber; // Increment match number
+        newGameState.lastWinner = lastWinnerOfMatch; // Carry over winner for starting next round
+        newGameState.isFirstRoundOfMatch = true; // Mark that it's the first round of the new match
+        gameState = newGameState; // Overwrite the old state completely
+
     } else {
         gameState.isFirstRoundOfMatch = false;
     }

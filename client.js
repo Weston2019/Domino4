@@ -254,27 +254,31 @@ function getPlayerIcon(imgElement, displayName, internalPlayerName) {
     imgElement.src = customAvatarSrc;
 }
 
-function determinePlayerPositions(myPlayerName, teams) {
-    if (!myPlayerName || !teams || !teams.teamA || !teams.teamA.length) return {};
-    const myTeam = teams.teamA.includes(myPlayerName) ? teams.teamA : teams.teamB;
-    const otherTeam = teams.teamA.includes(myPlayerName) ? teams.teamB : teams.teamA;
-    const myPartner = myTeam.find(p => p !== myPlayerName);
-    if (!myPartner || !otherTeam || otherTeam.length < 2) return { [myPlayerName]: 'bottom' };
-    const turnOrder = ["Jugador 1", "Jugador 3", "Jugador 2", "Jugador 4"];
-    const myTurnIndex = turnOrder.indexOf(myPlayerName);
-    if (myTurnIndex === -1) return {};
-    const leftPlayer = turnOrder[(myTurnIndex + 3) % 4];
+function determinePlayerPositions(myJugadorName) { // Corrected variable name
+    // This mapping represents the fixed physical seating arrangement at the table
+    const physicalLayout = {
+        "Jugador 1": { top: "Jugador 2", left: "Jugador 4", right: "Jugador 3" },
+        "Jugador 2": { top: "Jugador 1", left: "Jugador 3", right: "Jugador 4" },
+        "Jugador 3": { top: "Jugador 4", left: "Jugador 2", right: "Jugador 1" },
+        "Jugador 4": { top: "Jugador 3", left: "Jugador 1", right: "Jugador 2" }
+    };
+
+    const myLayout = physicalLayout[myJugadorName]; // Corrected variable name
+    if (!myLayout) return {};
+
     return {
-        [myPlayerName]: 'bottom',
-        [myPartner]: 'top',
-        [leftPlayer]: 'left',
-        [otherTeam.find(p => p !== leftPlayer)]: 'right',
+        [myJugadorName]: 'bottom', // Corrected variable name
+        [myLayout.top]: 'top',
+        [myLayout.left]: 'left',
+        [myLayout.right]: 'right'
     };
 }
 
 function updatePlayersUI() {
-    if (!gameState || !gameState.jugadoresInfo || !myJugadorName) { return; }
-    const playerPositions = determinePlayerPositions(myJugadorName, gameState.teams);
+    if (!gameState || !gameState.jugadoresInfo || !myJugadorName) { return; } // Corrected variable name
+
+    const playerPositions = determinePlayerPositions(myJugadorName); // Corrected variable name
+
     if (Object.keys(playerPositions).length < 4) {
         ['top', 'bottom', 'left', 'right'].forEach(pos => {
             const div = document.getElementById(`player-display-${pos}`);
@@ -287,7 +291,7 @@ function updatePlayersUI() {
         const position = playerPositions[playerName];
         const div = document.getElementById(`player-display-${position}`);
         if (!div) return;
-        
+
         const playerData = gameState.jugadoresInfo.find(p => p.name === playerName);
         if (!playerData) return;
 
