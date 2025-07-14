@@ -53,12 +53,14 @@ function setup() {
 function draw() {
     try {
         background(0, 100, 0); 
-        updateUI(); // Restored this function call
+        updateUI();
         updatePlayersUI();
         updateTeamInfo();
         updateScoreboard();
         updateMatchesWon();
-        if (gameState.board) drawBoard();
+        if (gameState.board && gameState.board.length > 0) {
+            drawBoard();
+        }
         if (myPlayerHand) drawHand();
         drawMessages();
     } catch (error) {
@@ -84,8 +86,6 @@ function setupLobby() {
     setNameBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
         if (name) {
-            // NOTE: The hasJoinedGame flag system has been removed to prevent UI conflicts.
-            // Visibility is now handled directly by the server's game state.
             lobbyContainer.style.display = 'none';
             connectToServer(name); 
         }
@@ -106,48 +106,43 @@ function connectToServer(playerName) {
     socket.on('playerAssigned', (name) => { myJugadorName = name; });
 
     socket.on('gameState', (state) => {
-        // NEW: Check if a new tile has been played and update the highlight info.
-        if (state.lastPlayedTile && 
-            (!gameState.lastPlayedTile || JSON.stringify(state.lastPlayedTile) !== JSON.stringify(gameState.lastPlayedTile))) {
-            lastPlayedHighlight = { tile: state.lastPlayedTile, timestamp: millis() };
-        }
         gameState = state;
-        
-        // This handles showing the "New Round" dialog
         const newRoundContainer = document.getElementById('new-round-container');
         if (!newRoundContainer) return;
 
-        if (!gameState.gameInitialized && gameState.endRoundMessage) {
+        // Determine if the "End of Round/Match" dialog should be visible
+        const shouldShowDialog = !gameState.gameInitialized && (gameState.endRoundMessage || gameState.matchOver);
+
+        if (shouldShowDialog) {
             const roundOverMessageDiv = document.getElementById('round-over-message');
             const newRoundBtn = document.getElementById('newRoundBtn');
-            roundOverMessageDiv.innerText = gameState.endRoundMessage;
+            const message = gameState.endMatchMessage || gameState.endRoundMessage || "Round Over";
+            
+            roundOverMessageDiv.innerText = message;
             newRoundContainer.style.display = 'block';
 
             const amIReady = gameState.readyPlayers && gameState.readyPlayers.includes(myJugadorName);
             newRoundBtn.disabled = amIReady;
-            newRoundBtn.innerText = amIReady ? 'Esperando por los demas...' : 'Mano Nueva';
-        } else if (gameState.gameInitialized) {
+            newRoundBtn.innerText = amIReady ? 'Esperando por los demas...' : (gameState.matchOver ? 'Jugar Match Nuevo' : 'Empezar Mano Nueva');
+        } else {
             newRoundContainer.style.display = 'none';
         }
     });
 
     socket.on('playerHand', (hand) => {
-    console.log('Received "playerHand" event from server. Data:', hand);
-    if (hand && hand.length > 0) {
-        console.log(`My hand is being updated with ${hand.length} tiles.`);
-    } else {
-        console.warn('Received an empty or invalid hand.');
-    }
-    myPlayerHand = hand || [];
-});
-
-
+        myPlayerHand = hand || [];
+    });
 
     socket.on('gameError', (data) => showMessage(data.message));
-    socket.on('moveSuccess', () => {
+
+    socket.on('moveSuccess', (data) => {
         selectedTileIndex = null;
         if (tileSound && tileSound.isLoaded()) {
             tileSound.play();
+        }
+        if (data && data.tile) {
+            lastPlayedHighlight.tile = data.tile;
+            lastPlayedHighlight.timestamp = millis();
         }
     });
 
@@ -173,7 +168,7 @@ function setupButtonListeners() {
 
     document.getElementById('passBtn').addEventListener('click', () => {
         if (clientHasValidMove()) {
-            showMessage('You have a valid move, you cannot pass!');
+            showMessage('Tiene jugada valida, no puede pasar!');
         } else {
             socket.emit('passTurn');
             if (tileSound && tileSound.isLoaded()) {
@@ -254,41 +249,71 @@ function getPlayerIcon(imgElement, displayName, internalPlayerName) {
     imgElement.src = customAvatarSrc;
 }
 
-function determinePlayerPositions(myJugadorName) { // Corrected variable name
-    // This mapping represents the fixed physical seating arrangement at the table
-    const physicalLayout = {
-        "Jugador 1": { top: "Jugador 2", left: "Jugador 4", right: "Jugador 3" },
-        "Jugador 2": { top: "Jugador 1", left: "Jugador 3", right: "Jugador 4" },
-        "Jugador 3": { top: "Jugador 4", left: "Jugador 2", right: "Jugador 1" },
-        "Jugador 4": { top: "Jugador 3", left: "Jugador 1", right: "Jugador 2" }
-    };
+/**
+ * Determines player UI positions dynamically based on teams and turn order.
+ * You are always 'bottom', your partner is 'top'.
+ */
+function determinePlayerPositions() {
+    if (!myJugadorName || !gameState.teams || !gameState.teams.teamA || !gameState.seating || gameState.seating.length < 4) {
+        return {};
+    }
 
-    const myLayout = physicalLayout[myJugadorName]; // Corrected variable name
-    if (!myLayout) return {};
+    const { teams, seating } = gameState;
+    
+    // Find my team and opponent team
+    let myTeam, opponentTeam;
+    if (teams.teamA.includes(myJugadorName)) {
+        myTeam = teams.teamA;
+        opponentTeam = teams.teamB;
+    } else if (teams.teamB.includes(myJugadorName)) {
+        myTeam = teams.teamB;
+        opponentTeam = teams.teamA;
+    } else {
+        return {}; // I'm not in a team
+    }
 
-    return {
-        [myJugadorName]: 'bottom', // Corrected variable name
-        [myLayout.top]: 'top',
-        [myLayout.left]: 'left',
-        [myLayout.right]: 'right'
+    // Find my partner
+    const partner = myTeam.find(p => p !== myJugadorName);
+
+    // Determine left and right opponents from the clockwise seating order
+    const mySeatingIndex = seating.indexOf(myJugadorName);
+    if (mySeatingIndex === -1) return {};
+
+    const rightOpponent = seating[(mySeatingIndex + 1) % 4];
+    const leftOpponent = seating[(mySeatingIndex + 3) % 4];
+
+    // Create the position mapping
+    const positions = {
+        [myJugadorName]: 'bottom',
+        [partner]: 'top',
+        [rightOpponent]: 'right',
+        [leftOpponent]: 'left'
     };
+    
+    // Validate that opponents are correct
+    if (!opponentTeam.includes(rightOpponent) || !opponentTeam.includes(leftOpponent)) {
+       // This can happen briefly during team rotation, return an empty object to avoid errors.
+       return {};
+    }
+
+    return positions;
 }
 
+
 function updatePlayersUI() {
-    if (!gameState || !gameState.jugadoresInfo || !myJugadorName) { return; } // Corrected variable name
+    if (!gameState || !gameState.jugadoresInfo || !myJugadorName) { return; }
 
-    const playerPositions = determinePlayerPositions(myJugadorName); // Corrected variable name
+    const playerPositions = determinePlayerPositions();
 
-    if (Object.keys(playerPositions).length < 4) {
-        ['top', 'bottom', 'left', 'right'].forEach(pos => {
-            const div = document.getElementById(`player-display-${pos}`);
-            if (div) div.style.display = 'none';
-        });
-        return;
-    };
+    // Hide all displays initially
+    ['top', 'bottom', 'left', 'right'].forEach(pos => {
+        const div = document.getElementById(`player-display-${pos}`);
+        if (div) div.style.display = 'none';
+    });
 
-    Object.keys(playerPositions).forEach(playerName => {
-        const position = playerPositions[playerName];
+    if (Object.keys(playerPositions).length < 4) return;
+
+    Object.entries(playerPositions).forEach(([playerName, position]) => {
         const div = document.getElementById(`player-display-${position}`);
         if (!div) return;
 
@@ -305,6 +330,7 @@ function updatePlayersUI() {
         const infoDiv = document.createElement('div');
         infoDiv.className = 'player-info-text';
 
+        // **FIX**: Re-added the internal player name (e.g., "Jugador 1") to the display.
         const finalDisplayName = `${playerData.displayName} (${playerData.name})`;
         infoDiv.innerHTML = `
             <div class="player-name">${finalDisplayName} ${playerName === myJugadorName ? '(You)' : ''}</div>
@@ -314,6 +340,7 @@ function updatePlayersUI() {
         div.appendChild(infoDiv);
 
         div.classList.toggle('current-turn', playerData.name === gameState.currentTurn);
+        div.classList.toggle('disconnected', !playerData.isConnected);
     });
 }
 
@@ -324,15 +351,12 @@ function updateTeamInfo() {
     
     const getDisplayName = (internalName) => {
         const player = gameState.jugadoresInfo.find(p => p.name === internalName);
-        if (player && player.displayName && player.displayName !== player.name) {
-            return `${player.displayName} (${player.name.slice(-1)})`;
-        }
         return player ? player.displayName : internalName;
     };
 
     let teamsHtml = `<b>Match ${matchNumber || 1}</b><br>`;
-    if (teams.teamA && teams.teamA.length > 0) { teamsHtml += `<b>Equipo A:</b> ${teams.teamA.map(getDisplayName).join(', ')}<br>`; }
-    if (teams.teamB && teams.teamB.length > 0) { teamsHtml += `<b>Equipo B:</b> ${teams.teamB.map(getDisplayName).join(', ')}<br>`; }
+    if (teams.teamA && teams.teamA.length > 0) { teamsHtml += `<b>Equipo A:</b> ${teams.teamA.map(getDisplayName).join(' & ')}<br>`; }
+    if (teams.teamB && teams.teamB.length > 0) { teamsHtml += `<b>Equipo B:</b> ${teams.teamB.map(getDisplayName).join(' & ')}<br>`; }
     teamInfoDiv.innerHTML = teamsHtml;
 }
 
@@ -448,7 +472,7 @@ function updateMatchesWon() {
     }
 
     container.style.display = 'block';
-    let matchesWonHtml = '';
+    let matchesWonHtml = '<b>Matches Won</b>';
 
     gameState.jugadoresInfo.forEach(playerInfo => {
         const stats = gameState.playerStats ? gameState.playerStats[playerInfo.name] : null;
@@ -458,7 +482,6 @@ function updateMatchesWon() {
 
     container.innerHTML = matchesWonHtml;
 }
-
 
 /**
  * Draws the entire board of played dominoes, handling the layout logic.
@@ -487,55 +510,74 @@ function drawBoard() {
     let straightCountR = 0, turnCountR = 0;
     let turnAfterR = 5;
 
-    for (let i = spinnerIndex + 1; i < board.length; i++) {
-        const domino = board[i];
-        const isDouble = domino.left === domino.right;
-        let x, y, w, h;
+for (let i = spinnerIndex + 1; i < board.length; i++) {
+    const domino = board[i];
+    const isDouble = domino.left === domino.right;
+    let x, y, w, h;
+if (isDouble) {
+    w = short;
+    h = long;
+    x = connR.x - w / 2;
+    y = connR.y - h / 2;
+}
+    const prevDomino = board[i - 1];
+    const prevWasDouble = prevDomino && prevDomino.left === prevDomino.right;
 
-        if (turnCountR < 2 && straightCountR >= turnAfterR) {
-            const oldDir = { ...dirR };
-            dirR = { x: -oldDir.y, y: oldDir.x };
+// --- Start of Replacement Code ---
 
-            w = (dirR.x !== 0) ? long : short;
-            h = (dirR.x !== 0) ? short : long;
-            
-            if (oldDir.x === 1) {
-                y = connR.y - short / 2;
-                x = connR.x + gap;
-            } else if (oldDir.y === 1) {
-                y = connR.y + gap;
-                x = connR.x + (short / 2) - w;
-            }
-            
-            turnCountR++;
-            turnAfterR = 4;
-            straightCountR = 0;
+    if (turnCountR < 2 && straightCountR >= turnAfterR) {
+        const oldDir = { ...dirR };
+        dirR = { x: -oldDir.y, y: oldDir.x }; // Calculate new direction
 
-        } else {
-            // THIS IS THE SECTION TO MODIFY FOR THE DOUBLES ON DOWN BRANCHES
-            if (dirR.x !== 0) { // Horizontal line
-                w = isDouble ? short : long;
-                h = isDouble ? long : short;
-            } else { // Vertical line (down branch)
-                // If it's a double on a vertical run, make it horizontal
-                w = isDouble ? long : short;
-                h = isDouble ? short : long;
-            }
-            
-            if (dirR.x === 1) { x = connR.x + gap; y = connR.y - h / 2; }
-            else if (dirR.y === 1) { y = connR.y + gap; x = connR.x - w / 2; }
-            else { x = connR.x - w - gap; y = connR.y - h / 2; }
+        // This new block correctly determines orientation and position for any turn.
+        if (oldDir.y === 1) { 
+            // This handles the exact case you screenshotted: turning from a downward branch.
+            w = long;  // Force the turning tile to be horizontal.
+            h = short;
+           // x = connR.x - w / 2; // Center it horizontally under the previous tile.
+            x = connR.x - w / 2 - 25; // Center it horizontally under the previous tile.
+            y = connR.y + gap;   // Place it at the bottom edge.
+        } else { 
+            // This handles the first turn from the main horizontal branch.
+            w = short; // Force the turning tile to be vertical.
+            h = long;
+            x = connR.x + gap;   // Place it at the right edge.
+           // y = connR.y - h / 2; // Center it vertically.
+              y = connR.y - short / 2 ;
+}
+        // Update counters after the turn logic
+        turnCountR++;
+        turnAfterR = 3; // Subsequent turns happen after 3 straight tiles
+        straightCountR = 0;
+
+    // --- End of Replacement Code ---
+   
+        // ... (The rest of your code for straight tiles remains the same)
+
+    } else {
+        if (dirR.x !== 0) { // Horizontal line
+            w = isDouble ? short : long;
+            h = isDouble ? long : short;
+        } else { // Vertical line (down branch)
+            w = isDouble ? long : short;
+            h = isDouble ? short : long;
         }
 
-        drawableTiles[i] = { domino, x, y, w, h, isReversed: (dirR.x === -1 || dirR.y === -1) };
-        
-        if (dirR.x === 1) { connR = { x: x + w, y: y + h / 2 }; }
-        else if (dirR.x === -1) { connR = { x: x, y: y + h / 2 }; }
-        else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h }; }
-        else { connR = { x: x + w / 2, y: y }; }
-        
-        straightCountR++;
+        if (dirR.x === 1) { x = connR.x + gap; y = connR.y - h / 2; }
+        else if (dirR.y === 1) { y = connR.y + gap; x = connR.x - w / 2; }
+        else { x = connR.x - w - gap; y = connR.y - h / 2; }
     }
+
+    drawableTiles[i] = { domino, x, y, w, h, isReversed: (dirR.x === -1 || dirR.y === -1) };
+
+    if (dirR.x === 1) { connR = { x: x + w, y: y + h / 2 }; }
+    else if (dirR.x === -1) { connR = { x: x, y: y + h / 2 }; }
+    else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h }; }
+    else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h/2 }; }
+    else { connR = { x: x + w / 2, y: y }; }
+
+    straightCountR++;
+}
 
     // --- Left Side of Spinner ---
     let connL = { x: spinnerX, y: spinnerY + spinnerH / 2 };
@@ -547,33 +589,50 @@ function drawBoard() {
         const domino = board[i];
         const isDouble = domino.left === domino.right;
         let x, y, w, h;
+ const prevDomino = board[i + 1];
+    const prevWasDouble = prevDomino && prevDomino.left === prevDomino.right;
+if (turnCountL < 2 && straightCountL >= turnAfterL) {
+    const oldDir = { ...dirL };
+    dirL = { x: oldDir.y, y: -oldDir.x };
 
-        if (turnCountL < 2 && straightCountL >= turnAfterL) {
-            const oldDir = { ...dirL };
-            dirL = { x: oldDir.y, y: -oldDir.x };
+    w = (dirL.x !== 0) ? long : short;
+    h = (dirL.x !== 0) ? short : long;
 
-            w = (dirL.x !== 0) ? long : short;
-            h = (dirL.x !== 0) ? short : long;
-            
-            if (oldDir.x === -1) {
-                y = connL.y - short / 2;
-                x = connL.x - w - gap;
-            } else if (oldDir.y === 1) {
-                y = connL.y + gap;
-                x = connL.x - (short / 2);
-            }
+    if (prevWasDouble) {
+        if (oldDir.x === -1) {                  // First turn on the top left
+            x = connL.x - w / 2 + 26.5; 
+            y = connL.y + short / 2 +25.5;
+           // y = connL.y + short / 2 +18;
 
-            turnCountL++;
-            turnAfterL = 3;
-            straightCountL = 0;
 
+
+        } else if (oldDir.y === 1) {            // Second turn on the bottom left.
+            x = connL.x + h;
+            // x = connL.x - w / 2 + 62.5; 
+            y = connL.y-w/2;
+           // y = connL.y;
+        }
+    
+    } else {
+    if (oldDir.x === -1) {
+    x = connL.x - w - gap;
+    y = connL.y - h / 2+ 25;
+   // y = connL.y - h / 2;
+
+    } else if (oldDir.y === 1) {
+        y = connL.y + gap;
+        x = connL.x - (short / 2);
+    }
+}
+
+    turnCountL++;
+    turnAfterL = 3;
+    straightCountL = 0;
         } else {
-            // THIS IS THE SECTION TO MODIFY FOR THE DOUBLES ON DOWN BRANCHES
             if (dirL.x !== 0) { // Horizontal line
                 w = isDouble ? short : long;
                 h = isDouble ? long : short;
             } else { // Vertical line (down branch)
-                // If it's a double on a vertical run, make it horizontal
                 w = isDouble ? long : short;
                 h = isDouble ? short : long;
             }
@@ -608,6 +667,7 @@ function drawBoard() {
         }
     });
 }
+
 
 
 function clientHasValidMove() {

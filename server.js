@@ -15,7 +15,7 @@ app.use(express.static(__dirname));
 // == GLOBAL VARIABLES & GAME STATE MANAGEMENT                                ==
 // =============================================================================
 
-const POINTS_TO_WIN_MATCH = 10;
+const POINTS_TO_WIN_MATCH = 20;
 let jugadores = createJugadores();
 let gameState = createNewGameState(jugadores); // Pass players to the function
 
@@ -58,7 +58,10 @@ function createNewGameState() {
         endRoundMessage: null,
         matchNumber: 1,
         playerStats: initialStats,
-        lastPlayedTile: null
+        lastPlayedTile: null,
+        matchOver: false, // Explicitly track match-over state
+        endMatchMessage: null,
+        seating: [] // Added to manage dynamic turn order
     };
 }
 
@@ -145,12 +148,17 @@ function hasValidMove(playerName) {
 }
 
 /**
- * (ROUTINE) Advances the turn to the next player.
+ * (ROUTINE) Advances the turn to the next player based on dynamic seating.
  */
 function nextTurn() {
-    if (!gameState.currentTurn) return;
-    const turnOrder = { "Jugador 1": "Jugador 3", "Jugador 3": "Jugador 2", "Jugador 2": "Jugador 4", "Jugador 4": "Jugador 1" };
-    gameState.currentTurn = turnOrder[gameState.currentTurn];
+    if (!gameState.currentTurn || !gameState.seating || gameState.seating.length === 0) return;
+    const currentIndex = gameState.seating.indexOf(gameState.currentTurn);
+    if (currentIndex === -1) {
+        console.error("Current player not in seating order!");
+        return;
+    }
+    const nextIndex = (currentIndex + 1) % 4;
+    gameState.currentTurn = gameState.seating[nextIndex];
 }
 
 /**
@@ -164,21 +172,29 @@ function initializeRound() {
     gameState.rightEnd = null;
     gameState.spinnerTile = null;
     gameState.endRoundMessage = null;
-    gameState.lastPlayedTile = null; 
+    gameState.lastPlayedTile = null;
+    gameState.matchOver = false;
+    gameState.endMatchMessage = null;
+
 
     const playerNames = ["Jugador 1", "Jugador 2", "Jugador 3", "Jugador 4"];
     const rotation = (gameState.matchNumber - 1) % 3;
-    if (rotation === 0) {
+    if (rotation === 0) { // Match 1: (1,2) vs (3,4)
         gameState.teams.teamA = [playerNames[0], playerNames[1]];
         gameState.teams.teamB = [playerNames[2], playerNames[3]];
-    } else if (rotation === 1) {
+    } else if (rotation === 1) { // Match 2: (1,3) vs (2,4)
         gameState.teams.teamA = [playerNames[0], playerNames[2]];
         gameState.teams.teamB = [playerNames[1], playerNames[3]];
-    } else {
+    } else { // Match 3: (1,4) vs (2,3)
         gameState.teams.teamA = [playerNames[0], playerNames[3]];
         gameState.teams.teamB = [playerNames[1], playerNames[2]];
     }
-    
+
+    // Set seating order for turns: [p1, p2, p1_partner, p2_partner]
+    const teamA = gameState.teams.teamA;
+    const teamB = gameState.teams.teamB;
+    gameState.seating = [teamA[0], teamB[0], teamA[1], teamB[1]];
+
     dealHands();
     const connectedPlayerNames = jugadores.filter(p => p.isConnected).map(p => p.name);
 
@@ -186,10 +202,11 @@ function initializeRound() {
         const startingPlayer = connectedPlayerNames.find(p => gameState.hands[p] && gameState.hands[p].some(t => t.left === 6 && t.right === 6));
         gameState.currentTurn = startingPlayer || "Jugador 1";
     } else {
-        gameState.currentTurn = gameState.lastWinner && connectedPlayerNames.includes(gameState.lastWinner) ? gameState.lastWinner : "Jugador 1";
+        gameState.currentTurn = gameState.lastWinner && connectedPlayerNames.includes(gameState.lastWinner) ? gameState.lastWinner : (gameState.seating[0] || "Jugador 1");
     }
     broadcastGameState();
 }
+
 
 /**
  * (ROUTINE) Ends the current round, calculates scores, and checks for a match winner.
@@ -217,8 +234,13 @@ function endRound(outcome) {
                 const points = scoreA < scoreB ? scoreB : scoreA;
                 gameState.teamScores[winningTeamKey] += points;
                 endMessage = `Juego Cerrado! Equipo ${winningTeamKey.slice(-1)} gana con menos puntos, gana ${points} puntos.`;
-                const reverseTurnOrder = { "Jugador 3": "Jugador 1", "Jugador 2": "Jugador 3", "Jugador 4": "Jugador 2", "Jugador 1": "Jugador 4" };
-                gameState.lastWinner = reverseTurnOrder[gameState.currentTurn];
+                // Determine next leader for blocked game
+                const allPipCounts = jugadores
+                    .filter(p => p.isConnected)
+                    .map(p => ({ player: p.name, score: calculateHandValue(gameState.hands[p.name]) }))
+                    .sort((a, b) => a.score - b.score);
+                if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
+
             } else {
                 endMessage = `Juego Cerrado! Empata nadie gana.`;
                 const allPipCounts = jugadores.map(p => p.isConnected ? { player: p.name, score: calculateHandValue(gameState.hands[p.name]) } : {player: p.name, score: Infinity});
@@ -243,28 +265,26 @@ function endRound(outcome) {
         
         matchOverMessage = `\n${winningTeamName} gana el match ${scoreA} a ${scoreB}!`;
 
-        // --- THOROUGH STATE RESET FOR NEW MATCH ---
-        const savedPlayerStats = { ...gameState.playerStats };
-        const nextMatchNumber = gameState.matchNumber + 1;
-        const lastWinnerOfMatch = gameState.lastWinner; 
-
-        const newGameState = createNewGameState(); // Get a fresh state object
-        newGameState.playerStats = savedPlayerStats; // Restore persistent stats
-        newGameState.matchNumber = nextMatchNumber; // Increment match number
-        newGameState.lastWinner = lastWinnerOfMatch; // Carry over winner for starting next round
-        newGameState.isFirstRoundOfMatch = true; // Mark that it's the first round of the new match
-        gameState = newGameState; // Overwrite the old state completely
-
-    } else {
-        gameState.isFirstRoundOfMatch = false;
+        // DO NOT RESET STATE HERE. Wait for players to be ready.
+        // Set flags to show the match over screen on the client.
+        gameState.matchOver = true;
+        gameState.endMatchMessage = matchOverMessage;
+        gameState.endRoundMessage = endMessage + matchOverMessage;
+        gameState.gameInitialized = false; 
+        gameState.readyPlayers.clear();
+        broadcastGameState();
+        return; // Stop further execution until players are ready.
     }
 
+    // Standard end of round (not end of match)
+    gameState.isFirstRoundOfMatch = false;
+    gameState.matchOver = false;
+    gameState.endMatchMessage = null;
     gameState.gameInitialized = false;
-    gameState.endRoundMessage = endMessage + matchOverMessage;
+    gameState.endRoundMessage = endMessage;
     gameState.readyPlayers.clear();
     broadcastGameState();
 }
-
 /**
  * (ROUTINE) Checks if the round should end after a move has been made.
  */
@@ -289,38 +309,27 @@ io.on('connection', (socket) => {
         const displayName = name.trim().substring(0, 12);
         if (!displayName) return;
         
-        // --- NEW: Check if name is already used by an ACTIVE player ---
         const nameInUse = jugadores.find(p => p.isConnected && p.assignedName && p.assignedName.trim() === displayName);
         if (nameInUse) {
-            console.log(`[CONNECTION BLOCKED] Name "${displayName}" is already in use by an active player.`);
             socket.emit('gameError', { message: `Name "${displayName}" is already taken. Please choose another.` });
-            return; // Stop processing
+            return;
         }
 
-        console.log(`[CONNECTION] Received setPlayerName: "${displayName}". Game initialized: ${gameState.gameInitialized}`);
-
-        // --- 1. ATTEMPT TO RECONNECT A DISCONNECTED PLAYER ---
         const reconnectingPlayer = jugadores.find(
             p => p.assignedName && p.assignedName.trim() === displayName && !p.isConnected && gameState.gameInitialized
         );
 
         if (reconnectingPlayer) {
-            console.log(`[RECONNECT] Found matching disconnected player: ${reconnectingPlayer.name}.`);
             reconnectingPlayer.socketId = socket.id;
             reconnectingPlayer.isConnected = true;
             socket.jugadorName = reconnectingPlayer.name;
             socket.emit('playerAssigned', reconnectingPlayer.name);
-
             const playerHand = gameState.hands[reconnectingPlayer.name];
-            console.log(`[RECONNECT] Sending hand of ${playerHand ? playerHand.length : 0} tiles to ${reconnectingPlayer.name}.`);
             io.to(socket.id).emit('playerHand', playerHand);
-
             broadcastGameState();
             return;
         }
 
-        console.log(`[NEW PLAYER] No reconnecting player found for "${displayName}". Treating as new.`);
-        // --- 2. IF NOT RECONNECTING, ASSIGN A NEW PLAYER SLOT ---
         const availableSlot = jugadores.find(p => !p.isConnected);
         if (availableSlot) {
             availableSlot.socketId = socket.id;
@@ -331,7 +340,10 @@ io.on('connection', (socket) => {
             console.log(`[NEW PLAYER] ${displayName} connected as ${availableSlot.name}.`);
 
             const connectedCount = jugadores.filter(p => p.isConnected).length;
-            if (connectedCount === 4 && !gameState.gameInitialized) {
+            
+            // **FIX**: Automatically start the game only if it's the very first round.
+            // For subsequent rounds/matches, wait for the 'playerReady' event.
+            if (connectedCount === 4 && !gameState.gameInitialized && !gameState.endRoundMessage && !gameState.matchOver) {
                 initializeRound();
             } else {
                 broadcastGameState();
@@ -385,7 +397,7 @@ io.on('connection', (socket) => {
             hand.splice(tileIndex, 1);
             gameState.lastPlayedTile = playedTileForHighlight;
             socket.emit('playerHand', gameState.hands[player]);
-            socket.emit('moveSuccess');
+            socket.emit('moveSuccess', { tile: playedTileForHighlight });
             nextTurn();
             checkRoundEnd();
         } else {
@@ -404,8 +416,23 @@ io.on('connection', (socket) => {
         if (!socket.jugadorName) return;
         gameState.readyPlayers.add(socket.jugadorName);
         broadcastGameState();
+
         const connectedPlayers = jugadores.filter(p => p.isConnected);
-        if (gameState.readyPlayers.size === connectedPlayers.length && connectedPlayers.length === 4) {
+        if (gameState.readyPlayers.size === connectedPlayers.length && connectedPlayers.length === 4) { // Ensure 4 players are ready
+            if (gameState.matchOver) {
+                // --- RESET STATE FOR NEW MATCH ---
+                const savedPlayerStats = { ...gameState.playerStats };
+                const nextMatchNumber = gameState.matchNumber + 1;
+                const lastWinnerOfMatch = gameState.lastWinner;
+
+                const newGameState = createNewGameState();
+                newGameState.playerStats = savedPlayerStats;
+                newGameState.matchNumber = nextMatchNumber;
+                newGameState.lastWinner = lastWinnerOfMatch;
+                newGameState.isFirstRoundOfMatch = true; 
+                gameState = newGameState;
+            }
+
             gameState.readyPlayers.clear();
             initializeRound();
         }
@@ -424,9 +451,15 @@ io.on('connection', (socket) => {
             console.log(`[DISCONNECTED] ${playerSlot.name} (${playerSlot.assignedName}).`);
             playerSlot.socketId = null;
             playerSlot.isConnected = false;
+            gameState.readyPlayers.delete(playerSlot.name);
             
             const connectedCount = jugadores.filter(p => p.isConnected).length;
-            if (connectedCount === 0) {
+            if (connectedCount < 4 && gameState.gameInitialized) {
+                // If a player disconnects mid-game, pause or handle accordingly
+                 console.log('[SERVER] A player disconnected mid-game. Pausing.');
+                 // For now, we just update clients. A more robust solution could pause the turn timer.
+                 broadcastGameState();
+            } else if (connectedCount === 0) {
                  console.log('[SERVER] All players disconnected. Resetting game state.');
                  jugadores = createJugadores();
                  gameState = createNewGameState();
