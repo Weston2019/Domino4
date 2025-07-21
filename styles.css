@@ -205,6 +205,10 @@ html, body {
     padding: 25px;
     pointer-events: auto;
     z-index: 100;
+    /* HIDE BY DEFAULT - Show only when needed via JavaScript */
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0;
 }
 #round-over-message {
     color: white;
