@@ -20,6 +20,7 @@ let tileSound; // A variable to hold the sound played when a tile is placed.
 let lastPlayedHighlight = { tile: null, timestamp: 0 }; // NEW: For the highlight effect.
 let avatarCache = {}; // Cache to prevent repeated avatar loading attempts
 let dialogShownTimestamp = 0; // Prevent dialog from being hidden too quickly
+let passSound; // Sound played when a player passes their turn
 
 
 // =============================================================================
@@ -31,7 +32,8 @@ let dialogShownTimestamp = 0; // Prevent dialog from being hidden too quickly
  */
 function preload() {
     soundFormats('mp3');
-    tileSound = loadSound('assets/sounds/tile_place.mp3'); 
+    tileSound = loadSound('assets/sounds/tile_place.mp3');
+    passSound = loadSound('assets/sounds/pass_turn.mp3'); 
 }
 /**
  * (p5.js function) Automatically called when the browser window is resized.
@@ -111,11 +113,23 @@ function setupLobby() {
     const nameInput = document.getElementById('name-input');
     const setNameBtn = document.getElementById('set-name-btn');
     nameInput.focus(); 
-    setNameBtn.addEventListener('click', () => {
+    
+    // Function to handle name submission
+    const submitName = () => {
         const name = nameInput.value.trim();
         if (name) {
             lobbyContainer.style.display = 'none';
             connectToServer(name); 
+        }
+    };
+    
+    // Handle button click
+    setNameBtn.addEventListener('click', submitName);
+    
+    // Handle Enter key press
+    nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            submitName();
         }
     });
 }
@@ -219,7 +233,7 @@ function connectToServer(playerName) {
                 // 2. OR explicit "Juego Cerrado!" message regardless of other conditions
                 if (hasBlockedMessage || (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage)) {
                     // This was a blocked game - server sent "Juego Cerrado!" or we can detect it
-                    message = gameState.endRoundMessage + "\n(Game was blocked - no valid moves remaining)";
+                    message = gameState.endRoundMessage + "\n(Juego cerrado ! - no hay jugadas validas)";
                 } else {
                     // Normal game end - someone won or domino occurred
                     message = gameState.endRoundMessage;
@@ -228,7 +242,7 @@ function connectToServer(playerName) {
             // Handle client-detected blocked games (no server message but game appears blocked)
             else if (isClientDetectedBlock) {
                 const playersWithTiles = gameState.jugadoresInfo.filter(player => player.tileCount > 0);
-                message = `Game Blocked!\nNo valid moves remaining.\nPlayers with tiles: ${playersWithTiles.map(p => `${p.displayName}(${p.tileCount})`).join(', ')}`;
+                message = `Juego Cerrado!\nNo quedan jugadas validas\nPlayers with tiles: ${playersWithTiles.map(p => `${p.displayName}(${p.tileCount})`).join(', ')}`;
             }
             // Handle other end game scenarios
             else if (gameState.endRoundMessage && gameState.endMatchMessage) {
@@ -352,8 +366,8 @@ function setupButtonListeners() {
             showMessage('Tiene jugada valida, no puede pasar!');
         } else {
             socket.emit('passTurn');
-            if (tileSound && tileSound.isLoaded()) {
-                tileSound.play();
+            if (passSound && passSound.isLoaded()) {
+                passSound.play();
             }
         }
     });
@@ -690,7 +704,7 @@ function updateMatchesWon() {
     }
 
     container.style.display = 'block';
-    let matchesWonHtml = '<b>Matches Won</b>';
+    let matchesWonHtml = '<b><div style="text-align: left; line-height: 1.2;">Juegos<br>Ganados</div></b>';
 
     gameState.jugadoresInfo.forEach(playerInfo => {
         const stats = gameState.playerStats ? gameState.playerStats[playerInfo.name] : null;
@@ -804,7 +818,7 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
 
         // 112. Increment turn counter and update settings
         turnCountR++;
-        turnAfterR = 3;
+        turnAfterR = 4;
         straightCountR = 0;
 
     // 113. Straight line positioning (no turn)

@@ -287,7 +287,7 @@ html, body {
     position: absolute;
     top: 120px; /* Adjust as needed */
     left: 15px;
-    color: white;
+    color: rgb(249, 247, 247);
     font-family: sans-serif;
     font-size: 14px;
 }
