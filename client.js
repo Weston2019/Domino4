@@ -1,5 +1,5 @@
 // =============================================================================
-// == FINAL LABELED client.js        7/10/2025                                         ==
+// == FINAL LABELED client.js        7/22/2025                                         ==
 // =============================================================================
 // This file handles all client-side logic, including rendering the game with
 // p5.js, communicating with the server via Socket.IO, and managing user input.
@@ -211,13 +211,13 @@ function connectToServer(playerName) {
             if (!roundOverMessageDiv || !newRoundBtn) return;
             
             // Combine both round and match messages when both are present
-            let message = "Round Over";
+            let message = "Mano Finalizada";
             
             // Handle blocked games specifically
             if (gameState.gameBlocked) {
-                message = "Game Blocked - No player can make a move!";
+                message = "Juego cerrado ! Nadie puede jugar!";
                 if (gameState.endRoundMessage) {
-                    message = gameState.endRoundMessage + "\n(Game was blocked)";
+                    message = gameState.endRoundMessage + "\n(Juego cerrado)";
                 }
             }
             // DETECT CLIENT-SIDE BLOCKS: If we have an endRoundMessage but players still have tiles
@@ -715,10 +715,8 @@ function updateMatchesWon() {
     container.innerHTML = matchesWonHtml;
 }
 
-/**
- * Draws the entire board of played dominoes, handling the layout logic.
- * This is your original function, with the glow logic integrated.
- */
+
+
 /**
  * Draws the entire board of played dominoes, handling the layout logic.
  * This is your original function, with the glow logic integrated.
