@@ -466,24 +466,49 @@ function getPlayerIcon(imgElement, displayName, internalPlayerName) {
     }
     
     // Initialize cache entry
-    avatarCache[playerKey] = { src: null, processed: false };
+    avatarCache[playerKey] = { src: null, processed: false, attemptIndex: 0 };
     
-    const customAvatarSrc = `assets/icons/${displayName}_avatar.jpg`;
+    // Create multiple filename variations to try
+    const avatarVariations = [
+        `assets/icons/${displayName}_avatar.jpg`,           // Original case
+        `assets/icons/${displayName.toLowerCase()}_avatar.jpg`, // All lowercase
+        `assets/icons/${displayName.toUpperCase()}_avatar.jpg`, // All uppercase
+        `assets/icons/${displayName.charAt(0).toUpperCase() + displayName.slice(1).toLowerCase()}_avatar.jpg` // Title case
+    ];
+    
     const match = internalPlayerName.match(/\d+/);
     const playerNumber = match ? match[0] : 'default';
     const defaultAvatarSrc = `assets/icons/jugador${playerNumber}_avatar.jpg`;
     
+    // Function to try the next avatar variation
+    const tryNextAvatar = () => {
+        const currentAttempt = avatarCache[playerKey].attemptIndex;
+        
+        if (currentAttempt < avatarVariations.length) {
+            avatarCache[playerKey].attemptIndex++;
+            imgElement.src = avatarVariations[currentAttempt];
+        } else {
+            // All custom variations failed, try default
+            imgElement.src = defaultAvatarSrc;
+        }
+    };
+    
     // Set up error handling before setting the source
     imgElement.onerror = function() {
-        // Only try the default if we haven't already and this is the custom avatar
-        if (this.src.includes(`${displayName}_avatar.jpg`)) {
-            this.src = defaultAvatarSrc;
-        } else {
-            // If default also fails, cache the failure and hide the image
+        const currentAttempt = avatarCache[playerKey].attemptIndex - 1;
+        
+        // If we're still trying custom avatar variations
+        if (currentAttempt < avatarVariations.length - 1) {
+            tryNextAvatar();
+        } else if (this.src === defaultAvatarSrc) {
+            // Even default failed, cache the failure and hide the image
             avatarCache[playerKey].src = null;
             avatarCache[playerKey].processed = true;
             this.style.display = 'none';
             this.onerror = null;
+        } else {
+            // Try default avatar
+            this.src = defaultAvatarSrc;
         }
     };
     
@@ -495,7 +520,8 @@ function getPlayerIcon(imgElement, displayName, internalPlayerName) {
         this.onload = null;
     };
     
-    imgElement.src = customAvatarSrc;
+    // Start with the first variation
+    tryNextAvatar();
 }
 
 /**
