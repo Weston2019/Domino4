@@ -1020,7 +1020,7 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
 
         // 112. Increment turn counter and update settings
         turnCountR++;
-        turnAfterR = 4;
+        turnAfterR = 3;
         straightCountR = 0;
 
     // 113. Straight line positioning (no turn)
@@ -1050,7 +1050,6 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
     // 120. Update connection point based on domino direction
     if (dirR.x === 1) { connR = { x: x + w, y: y + h / 2 }; } 
     else if (dirR.x === -1) { connR = { x: x, y: y + h / 2 }; } 
-    // else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h }; } 
     else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h }; } // Downward turn
     else { connR = { x: x + w / 2, y: y }; }
     

@@ -212,7 +212,7 @@ function initializeRound() {
  * (ROUTINE) Ends the current round, calculates scores, and checks for a match winner.
  */
 function endRound(outcome) {
-    let endMessage = "Round Over!";
+    let endMessage = "Mano finalizada!";
     let matchOverMessage = "";
 
     try {
@@ -249,7 +249,7 @@ function endRound(outcome) {
                 if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
 
             } else {
-                endMessage = `Juego Cerrado! Empata nadie gana.`;
+                endMessage = `Juego Cerrado! Empate nadie gana.`;
                 const allPipCounts = jugadores.map(p => p.isConnected ? { player: p.name, score: calculateHandValue(gameState.hands[p.name]) } : {player: p.name, score: Infinity});
                 allPipCounts.sort((a, b) => a.score - b.score);
                 if(allPipCounts.length > 0) gameState.lastWinner = allPipCounts[0].player;
@@ -374,7 +374,7 @@ io.on('connection', (socket) => {
 
         if (gameState.isFirstMove) {
             if (gameState.isFirstRoundOfMatch && (tile.left !== 6 || tile.right !== 6)) {
-                return socket.emit('gameError', { message: 'First move must be 6|6!' });
+                return socket.emit('gameError', { message: 'Primera ficha debe ser 6|6!' });
             }
             const firstTile = hand[tileIndex];
             gameState.board.push(firstTile);
@@ -415,7 +415,7 @@ io.on('connection', (socket) => {
             nextTurn();
             checkRoundEnd();
         } else {
-            socket.emit('gameError', { message: 'Invalid move!' });
+            socket.emit('gameError', { message: 'Jugada inválida!' });
         }
     });
 
