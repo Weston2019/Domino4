@@ -21,6 +21,7 @@ let lastPlayedHighlight = { tile: null, timestamp: 0 }; // NEW: For the highligh
 let avatarCache = {}; // Cache to prevent repeated avatar loading attempts
 let dialogShownTimestamp = 0; // Prevent dialog from being hidden too quickly
 let passSound; // Sound played when a player passes their turn
+let winSound; // Sound played when a player wins the hand (domino)
 
 
 // =============================================================================
@@ -34,6 +35,7 @@ function preload() {
     soundFormats('mp3');
     tileSound = loadSound('assets/sounds/tile_place.mp3');
     passSound = loadSound('assets/sounds/pass_turn.mp3'); 
+    winSound = loadSound('assets/sounds/win_bell.mp3');
 }
 /**
  * (p5.js function) Automatically called when the browser window is resized.
@@ -233,7 +235,7 @@ function connectToServer(playerName) {
                 // 2. OR explicit "Juego Cerrado!" message regardless of other conditions
                 if (hasBlockedMessage || (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage)) {
                     // This was a blocked game - server sent "Juego Cerrado!" or we can detect it
-                    message = gameState.endRoundMessage + "\n(Juego cerrado ! - no hay jugadas validas)";
+                    message = gameState.endRoundMessage;
                 } else {
                     // Normal game end - someone won or domino occurred
                     message = gameState.endRoundMessage;
@@ -349,6 +351,13 @@ function connectToServer(playerName) {
     socket.on('playerPassed', (data) => {
         if (passSound && passSound.isLoaded()) {
             passSound.play();
+        }
+    });
+
+    // NEW: Listen for domino win bell sounds from ANY player
+    socket.on('playerWonHand', (data) => {
+        if (winSound && winSound.isLoaded()) {
+            winSound.play();
         }
     });
 

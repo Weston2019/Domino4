@@ -225,6 +225,13 @@ function endRound(outcome) {
             gameState.teamScores[winnerTeam] += points;
             const winnerDisplayName = gameState.jugadoresInfo.find(p => p.name === winner).displayName;
             endMessage = `${winnerDisplayName} domino! Equipo ${winnerTeam.slice(-1)} gana ${points} puntos!`;
+            
+            // NEW: Broadcast domino win bell sound to ALL players
+            io.emit('playerWonHand', { 
+                playerName: winner, 
+                displayName: winnerDisplayName,
+                points: points 
+            });
         } else if (outcome.blocked) {
             const scoreA = gameState.teams.teamA.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
             const scoreB = gameState.teams.teamB.reduce((total, p) => total + calculateHandValue(gameState.hands[p]), 0);
