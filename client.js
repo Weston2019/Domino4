@@ -23,6 +23,11 @@ let dialogShownTimestamp = 0; // Prevent dialog from being hidden too quickly
 let passSound; // Sound played when a player passes their turn
 let winSound; // Sound played when a player wins the hand (domino)
 
+// Voice chat variables
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+
 
 // =============================================================================
 // == P5.JS CORE FUNCTIONS (PRELOAD, SETUP, DRAW)                             ==
@@ -36,6 +41,11 @@ function preload() {
     tileSound = loadSound('assets/sounds/tile_place.mp3');
     passSound = loadSound('assets/sounds/pass_turn.mp3'); 
     winSound = loadSound('assets/sounds/win_bell.mp3');
+    
+    // Set volume levels (0.0 to 1.0, where 1.0 is maximum)
+    if (passSound) passSound.setVolume(0.8); // Increase pass sound volume
+    if (tileSound) tileSound.setVolume(0.6); // Optional: adjust tile sound
+    if (winSound) winSound.setVolume(0.7);   // Optional: adjust win sound
 }
 /**
  * (p5.js function) Automatically called when the browser window is resized.
@@ -370,6 +380,11 @@ function connectToServer(playerName) {
         messagesDiv.appendChild(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
+
+    // NEW: Listen for voice messages
+    socket.on('voiceMessage', (data) => {
+        playVoiceMessage(data);
+    });
 }
 
 
@@ -403,6 +418,25 @@ function setupButtonListeners() {
             chatInput.value = '';
         }
     });
+
+    // Voice chat button (Push to Talk)
+    const voiceChatBtn = document.getElementById('voice-chat-btn');
+    if (voiceChatBtn) {
+        // Mouse events
+        voiceChatBtn.addEventListener('mousedown', startVoiceRecording);
+        voiceChatBtn.addEventListener('mouseup', stopVoiceRecording);
+        voiceChatBtn.addEventListener('mouseleave', stopVoiceRecording);
+        
+        // Touch events for mobile
+        voiceChatBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startVoiceRecording();
+        });
+        voiceChatBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopVoiceRecording();
+        });
+    }
 }
 
 function handlePlay(position) {
@@ -1121,4 +1155,110 @@ function clientHasValidMove() {
         return true;
     }
     return myPlayerHand.some(t => t.left === gameState.leftEnd || t.right === gameState.leftEnd || t.left === gameState.rightEnd || t.right === gameState.rightEnd);
+}
+
+
+// =============================================================================
+// == VOICE CHAT FUNCTIONS                                                    ==
+// =============================================================================
+
+async function startVoiceRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            sendVoiceMessage(audioBlob);
+            // Stop all tracks to release microphone
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        isRecording = true;
+        console.log("🎤 Recording started...");
+        
+        // Visual feedback
+        const voiceBtn = document.getElementById('voice-chat-btn');
+        if (voiceBtn) {
+            voiceBtn.style.backgroundColor = '#ff4444';
+            voiceBtn.textContent = '🔴 Recording...';
+        }
+        
+    } catch (error) {
+        console.error("Error accessing microphone:", error);
+        alert("Could not access microphone. Please check permissions.");
+    }
+}
+
+function stopVoiceRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        console.log("🎤 Recording stopped");
+        
+        // Reset visual feedback
+        const voiceBtn = document.getElementById('voice-chat-btn');
+        if (voiceBtn) {
+            voiceBtn.style.backgroundColor = '#4CAF50';
+            voiceBtn.textContent = '🎤 Hold to Talk';
+        }
+    }
+}
+
+function sendVoiceMessage(audioBlob) {
+    // Convert to base64 and send via socket
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        const base64Audio = reader.result.split(',')[1];
+        const myDisplayName = gameState.jugadoresInfo?.find(p => p.name === myJugadorName)?.displayName || 'Unknown';
+        
+        socket.emit('voiceMessage', { 
+            audio: base64Audio, 
+            sender: myDisplayName,
+            timestamp: Date.now()
+        });
+        
+        // Add to chat as voice message indicator
+        const messagesDiv = document.getElementById('chat-messages');
+        const messageElement = document.createElement('p');
+        messageElement.innerHTML = `<b>You:</b> 🎤 Voice Message`;
+        messageElement.style.fontStyle = 'italic';
+        messageElement.style.color = '#888';
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    };
+    reader.readAsDataURL(audioBlob);
+}
+
+function playVoiceMessage(data) {
+    try {
+        // Convert base64 back to audio
+        const audioData = `data:audio/wav;base64,${data.audio}`;
+        const audio = new Audio(audioData);
+        audio.volume = 0.8;
+        
+        // Add to chat as received voice message
+        const messagesDiv = document.getElementById('chat-messages');
+        const messageElement = document.createElement('p');
+        const senderName = data.sender || 'Unknown';
+        messageElement.innerHTML = `<b>${senderName}:</b> 🎤 Voice Message`;
+        messageElement.style.fontStyle = 'italic';
+        messageElement.style.color = '#666';
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Play the audio
+        audio.play().catch(error => {
+            console.error("Error playing voice message:", error);
+        });
+        
+    } catch (error) {
+        console.error("Error processing voice message:", error);
+    }
 }
