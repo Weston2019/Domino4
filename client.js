@@ -332,12 +332,23 @@ function connectToServer(playerName) {
 
     socket.on('moveSuccess', (data) => {
         selectedTileIndex = null;
-        if (tileSound && tileSound.isLoaded()) {
-            tileSound.play();
-        }
         if (data && data.tile) {
             lastPlayedHighlight.tile = data.tile;
             lastPlayedHighlight.timestamp = millis();
+        }
+    });
+
+    // NEW: Listen for tile placement sounds from ANY player
+    socket.on('tilePlaced', (data) => {
+        if (tileSound && tileSound.isLoaded()) {
+            tileSound.play();
+        }
+    });
+
+    // NEW: Listen for pass turn sounds from ANY player  
+    socket.on('playerPassed', (data) => {
+        if (passSound && passSound.isLoaded()) {
+            passSound.play();
         }
     });
 
@@ -366,9 +377,6 @@ function setupButtonListeners() {
             showMessage('Tiene jugada valida, no puede pasar!');
         } else {
             socket.emit('passTurn');
-            if (passSound && passSound.isLoaded()) {
-                passSound.play();
-            }
         }
     });
 
@@ -564,9 +572,34 @@ function updatePlayersUI() {
 
         // **FIX**: Re-added the internal player name (e.g., "Jugador 1") to the display.
         const finalDisplayName = `${playerData.displayName} (${playerData.name})`;
-        infoDiv.innerHTML = `
-            <div class="player-name">${finalDisplayName} ${playerName === myJugadorName ? '(You)' : ''}</div>
-            <div class="tile-count">Fichas: ${playerData.tileCount}</div>`;
+        
+        // Create the player name div
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'player-name';
+        nameDiv.textContent = `${finalDisplayName} ${playerName === myJugadorName ? '(You)' : ''}`;
+        
+        // Create the tile count container
+        const tileCountDiv = document.createElement('div');
+        tileCountDiv.className = 'tile-count';
+        tileCountDiv.style.cssText = `
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2px;
+        `;
+        
+        // Add the text
+        const tileText = document.createElement('span');
+        tileText.textContent = `Fichas: ${playerData.tileCount}`;
+        tileCountDiv.appendChild(tileText);
+        
+        // Add tiny visual dominoes
+        const tinyTilesDisplay = createTinyTilesDisplay(playerData.tileCount);
+        tileCountDiv.appendChild(tinyTilesDisplay);
+        
+        // Append both divs to infoDiv
+        infoDiv.appendChild(nameDiv);
+        infoDiv.appendChild(tileCountDiv);
 
         div.appendChild(imgElement);
         div.appendChild(infoDiv);
@@ -611,6 +644,77 @@ function drawMessages() {
     } else {
         messageDiv.innerText = '';
     }
+}
+
+/**
+ * Creates a small visual domino tile as an HTML element
+ */
+function createTinyDomino() {
+    const tinyTile = document.createElement('div');
+    tinyTile.className = 'tiny-domino';
+    tinyTile.style.cssText = `
+        width: 12px;
+        height: 20px;
+        background: #f5f5f5;
+        border: 1px solid #333;
+        border-radius: 2px;
+        display: inline-block;
+        margin: 0 1px;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    `;
+    
+    // Add a tiny divider line
+    const divider = document.createElement('div');
+    divider.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 1px;
+        right: 1px;
+        height: 1px;
+        background: #333;
+        transform: translateY(-50%);
+    `;
+    tinyTile.appendChild(divider);
+    
+    return tinyTile;
+}
+
+/**
+ * Creates a container with tiny domino tiles representing the tile count
+ */
+function createTinyTilesDisplay(tileCount) {
+    const container = document.createElement('div');
+    container.className = 'tiny-tiles-container';
+    container.style.cssText = `
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-left: 5px;
+        max-width: 80px;
+        gap: 1px;
+    `;
+    
+    // Create tiny dominoes up to the tile count (max 7 for visual clarity)
+    const tilesToShow = Math.min(tileCount, 7);
+    for (let i = 0; i < tilesToShow; i++) {
+        container.appendChild(createTinyDomino());
+    }
+    
+    // If more than 7 tiles, add a "+X" indicator
+    if (tileCount > 7) {
+        const extraIndicator = document.createElement('span');
+        extraIndicator.textContent = `+${tileCount - 7}`;
+        extraIndicator.style.cssText = `
+            font-size: 10px;
+            color: #666;
+            margin-left: 2px;
+            font-weight: bold;
+        `;
+        container.appendChild(extraIndicator);
+    }
+    
+    return container;
 }
 
 

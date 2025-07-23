@@ -398,6 +398,13 @@ io.on('connection', (socket) => {
             gameState.lastPlayedTile = playedTileForHighlight;
             socket.emit('playerHand', gameState.hands[player]);
             socket.emit('moveSuccess', { tile: playedTileForHighlight });
+            
+            // NEW: Broadcast tile placement sound to ALL players
+            io.emit('tilePlaced', { 
+                playerName: player, 
+                tile: playedTileForHighlight 
+            });
+            
             nextTurn();
             checkRoundEnd();
         } else {
@@ -408,6 +415,12 @@ io.on('connection', (socket) => {
     socket.on('passTurn', () => {
         const player = socket.jugadorName;
         if (!gameState.gameInitialized || gameState.currentTurn !== player || hasValidMove(player)) return;
+        
+        // NEW: Broadcast pass turn sound to ALL players
+        io.emit('playerPassed', { 
+            playerName: player 
+        });
+        
         nextTurn();
         checkRoundEnd();
     });
