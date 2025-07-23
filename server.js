@@ -458,14 +458,59 @@ io.on('connection', (socket) => {
         }
     });
 
+// Add this to your server.js socket event handlers
+socket.on('voiceMessage', (data) => {
+    // Broadcast voice message to all other players
+    socket.broadcast.emit('voiceMessage', {
+        audio: data.audio,
+        sender: data.sender,
+        timestamp: data.timestamp
+    });
+    });
+
+    socket.on('restartGame', () => {
+        const player = jugadores.find(p => p.socketId === socket.id);
+        if (!player) return;
+
+        console.log(`[RESTART GAME] ${player.assignedName || player.name} initiated game restart.`);
+        
+        // Reset all game state while keeping connected players
+        const connectedPlayers = jugadores.filter(p => p.isConnected);
+        
+        // Create fresh game state
+        gameState = createNewGameState();
+        
+        // Preserve player connections but reset their assigned names
+        connectedPlayers.forEach(p => {
+            gameState.playerStats[p.name] = { matchesWon: 0 };
+        });
+        
+        // Clear ready players
+        gameState.readyPlayers.clear();
+        
+        // Broadcast restart message
+        io.emit('gameRestarted', { 
+            message: `${player.assignedName || player.name} reinició el juego`,
+            restartedBy: player.assignedName || player.name
+        });
+        
+        // Broadcast fresh game state
+        broadcastGameState();
+        
+        // Start a new round if we have 4 players
+        if (connectedPlayers.length === 4) {
+            setTimeout(() => {
+                initializeRound();
+            }, 2000); // Give players 2 seconds to see the restart message
+        }
+    });
+
     socket.on('chatMessage', (msg) => {
         const player = jugadores.find(p => p.socketId === socket.id);
         if (player && msg) {
             io.emit('chatMessage', { sender: player.assignedName || player.name, message: msg.substring(0, 100) });
         }
-    });
-
-    socket.on('disconnect', () => {
+    });    socket.on('disconnect', () => {
         const playerSlot = jugadores.find(p => p.socketId === socket.id);
         if (playerSlot) {
             console.log(`[DISCONNECTED] ${playerSlot.name} (${playerSlot.assignedName}).`);

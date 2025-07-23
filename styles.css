@@ -176,18 +176,54 @@ html, body {
     z-index: 20;
 }
 
+/* --- Restart Game Button --- */
+#restart-game-container {
+    position: absolute;
+    top: 10px;
+    right: 150px;
+    z-index: 30;
+}
+
+#restart-game-btn {
+    background-color: #dc3545;
+    color: white;
+    border: 2px solid #c82333;
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background-color 0.3s ease;
+}
+
+#restart-game-btn:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+#restart-game-btn:active {
+    background-color: #bd2130;
+}
+
 /* --- Other UI Elements --- */
 #message-display, #game-buttons, #new-round-container {
     position: absolute;
     text-align: center;
 }
 #message-display {
-    width: 100%;
-    top: 15px;
+    width: 60%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     color: yellow;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
     text-shadow: 2px 2px 4px black;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 1000;
 }
 #game-buttons {
     bottom: var(--buttons-bottom-position); 
@@ -440,4 +476,25 @@ html, body {
     padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
+}
+
+/* Voice chat button styles */
+#voice-chat-btn {
+    background-color: #4CAF50 !important;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+#voice-chat-btn:hover {
+    background-color: #45a049 !important;
+}
+
+#voice-chat-btn:active {
+    background-color: #ff4444 !important;
 }

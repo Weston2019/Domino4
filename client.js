@@ -43,7 +43,7 @@ function preload() {
     winSound = loadSound('assets/sounds/win_bell.mp3');
     
     // Set volume levels (0.0 to 1.0, where 1.0 is maximum)
-    if (passSound) passSound.setVolume(0.8); // Increase pass sound volume
+    if (passSound) passSound.setVolume(1.0); // Increase pass sound volume
     if (tileSound) tileSound.setVolume(0.6); // Optional: adjust tile sound
     if (winSound) winSound.setVolume(0.7);   // Optional: adjust win sound
 }
@@ -371,6 +371,25 @@ function connectToServer(playerName) {
         }
     });
 
+    socket.on('gameRestarted', (data) => {
+        // Clear local state
+        myPlayerHand = [];
+        selectedTileIndex = null;
+        messageDisplay = { text: '', time: 0 };
+        
+        // Show restart message
+        showMessage(`🔄 ${data.message}`);
+        
+        // Add restart notification to chat
+        const messagesDiv = document.getElementById('chat-messages');
+        const messageElement = document.createElement('p');
+        messageElement.innerHTML = `<b>SISTEMA:</b> 🔄 Juego reiniciado por ${data.restartedBy}`;
+        messageElement.style.color = '#ffaa00';
+        messageElement.style.fontWeight = 'bold';
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
     socket.on('chatMessage', (data) => {
         const messagesDiv = document.getElementById('chat-messages');
         const messageElement = document.createElement('p');
@@ -418,6 +437,16 @@ function setupButtonListeners() {
             chatInput.value = '';
         }
     });
+
+    // Restart game button
+    const restartGameBtn = document.getElementById('restart-game-btn');
+    if (restartGameBtn) {
+        restartGameBtn.addEventListener('click', () => {
+            if (confirm('¿Estás seguro de que quieres reiniciar el juego completamente? Esto borrará todos los puntajes y estadísticas.')) {
+                socket.emit('restartGame');
+            }
+        });
+    }
 
     // Voice chat button (Push to Talk)
     const voiceChatBtn = document.getElementById('voice-chat-btn');
@@ -710,8 +739,10 @@ function drawMessages() {
     if (!messageDiv) return;
     if (messageDisplay.text && millis() - messageDisplay.time < 5000) {
         messageDiv.innerText = messageDisplay.text;
+        messageDiv.style.display = 'block';
     } else {
         messageDiv.innerText = '';
+        messageDiv.style.display = 'none';
     }
 }
 
@@ -1164,16 +1195,42 @@ function clientHasValidMove() {
 
 async function startVoiceRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                sampleRate: 44100
+            }
+        });
+        
+        // Try different audio formats for better compatibility
+        let options = { mimeType: 'audio/webm;codecs=opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'audio/mp4' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = {}; // Use default
+                }
+            }
+        }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
         audioChunks = [];
         
+        console.log("🎤 Using audio format:", mediaRecorder.mimeType);
+        
         mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                console.log("🎤 Audio chunk received:", event.data.size, "bytes");
+            }
         };
         
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            console.log("🎤 Recording stopped, processing audio...");
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            console.log("🎤 Audio blob size:", audioBlob.size, "bytes");
             sendVoiceMessage(audioBlob);
             // Stop all tracks to release microphone
             stream.getTracks().forEach(track => track.stop());
@@ -1191,7 +1248,7 @@ async function startVoiceRecording() {
         }
         
     } catch (error) {
-        console.error("Error accessing microphone:", error);
+        console.error("🎤 Error accessing microphone:", error);
         alert("Could not access microphone. Please check permissions.");
     }
 }
@@ -1212,11 +1269,21 @@ function stopVoiceRecording() {
 }
 
 function sendVoiceMessage(audioBlob) {
+    console.log("🎤 Sending voice message, blob size:", audioBlob.size);
+    
+    if (audioBlob.size === 0) {
+        console.error("🎤 Audio blob is empty!");
+        return;
+    }
+    
     // Convert to base64 and send via socket
     const reader = new FileReader();
     reader.onloadend = () => {
         const base64Audio = reader.result.split(',')[1];
         const myDisplayName = gameState.jugadoresInfo?.find(p => p.name === myJugadorName)?.displayName || 'Unknown';
+        
+        console.log("🎤 Base64 audio length:", base64Audio.length);
+        console.log("🎤 Sending as:", myDisplayName);
         
         socket.emit('voiceMessage', { 
             audio: base64Audio, 
@@ -1227,21 +1294,35 @@ function sendVoiceMessage(audioBlob) {
         // Add to chat as voice message indicator
         const messagesDiv = document.getElementById('chat-messages');
         const messageElement = document.createElement('p');
-        messageElement.innerHTML = `<b>You:</b> 🎤 Voice Message`;
+        messageElement.innerHTML = `<b>You:</b> 🎤 Voice Message (${Math.round(audioBlob.size/1024)}KB)`;
         messageElement.style.fontStyle = 'italic';
         messageElement.style.color = '#888';
         messagesDiv.appendChild(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     };
+    
+    reader.onerror = (error) => {
+        console.error("🎤 Error reading audio blob:", error);
+    };
+    
     reader.readAsDataURL(audioBlob);
 }
 
 function playVoiceMessage(data) {
     try {
+        console.log("🎵 Received voice message from:", data.sender);
+        console.log("🎵 Audio data length:", data.audio ? data.audio.length : 'No audio data');
+        
         // Convert base64 back to audio
         const audioData = `data:audio/wav;base64,${data.audio}`;
         const audio = new Audio(audioData);
         audio.volume = 0.8;
+        
+        // Add debugging for audio events
+        audio.onloadeddata = () => console.log("🎵 Audio loaded successfully");
+        audio.oncanplay = () => console.log("🎵 Audio can play");
+        audio.onerror = (error) => console.error("🎵 Audio error:", error);
+        audio.onended = () => console.log("🎵 Audio playback ended");
         
         // Add to chat as received voice message
         const messagesDiv = document.getElementById('chat-messages');
@@ -1254,11 +1335,14 @@ function playVoiceMessage(data) {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
         // Play the audio
-        audio.play().catch(error => {
-            console.error("Error playing voice message:", error);
+        audio.play().then(() => {
+            console.log("🎵 Audio started playing");
+        }).catch(error => {
+            console.error("🎵 Error playing voice message:", error);
+            alert("Could not play voice message. Check browser audio permissions.");
         });
         
     } catch (error) {
-        console.error("Error processing voice message:", error);
+        console.error("🎵 Error processing voice message:", error);
     }
 }
