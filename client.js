@@ -932,9 +932,9 @@ function drawBoard() {
     // 53. Extract board data and define domino dimensions
     const { board, spinnerTile } = gameState;
     // 54. Set standard domino dimensions and spacing
-    const long = 100, short = 50, gap = 2;
+    const long = 100*.95, short = 50*.95, gap = 2;
     // 55. Calculate board center Y position
-    const boardCenterY = height / 2 - 225;
+    const boardCenterY = height / 2 - 215;
 
     // 56. Find spinner tile index in the board array
     const spinnerIndex = board.findIndex(t => t.left === spinnerTile.left && t.right === spinnerTile.right);
@@ -956,8 +956,7 @@ function drawBoard() {
 
 
 
-    // --- Right Side of Spinner ---
-// --- Right Side of Spinner ---
+
 // --- Right Side of Spinner ---
 // 94. Initialize right side connection point at spinner's right edge
 let connR = { x: spinnerX + spinnerW, y: spinnerY + spinnerH / 2 };
@@ -1000,8 +999,8 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
             // 108. Second turn positioning after double (bottom right)
             } else if (oldDir.y === 1) {            // <<<<<<< UNIFIED LOGIC APPLIED
              
-             x = connR.x - long - short;                
-             y = connR.y - short;             
+             x = connR.x - w - (w * 0.5);  // Use tile width + 50% instead of fixed long + short            
+             y = connR.y - h;             
             }
 
         // 109. Regular turn positioning (not after double)
@@ -1009,18 +1008,18 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
             // 110. First turn positioning (regular)
             if (oldDir.x === 1) {
                 x = connR.x + gap;
-                y = connR.y - h / 2 + 25;
+                y = connR.y - h / 2 + (h * 0.25);  // Use 25% of tile height instead of fixed 25
 
             // 111. Second turn positioning (regular)
             } else if (oldDir.y === 1) {            // Second turn positioning (regular)
                y = connR.y + gap;
-               x = connR.x - w / 2 - (long / 4);   // Reduce x by 1/4 of tile length
+               x = connR.x - w / 2 - (w * 0.25);   // Use 25% of tile width instead of fixed (long / 4)
             }
         }
 
         // 112. Increment turn counter and update settings
         turnCountR++;
-        turnAfterR = 3;
+        turnAfterR = 4;
         straightCountR = 0;
 
     // 113. Straight line positioning (no turn)
@@ -1094,13 +1093,13 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
     if (prevWasDouble) {
         // 107. First turn positioning after double (top left)
         if (oldDir.x === -1) {                  // First turn on the top left
-            x = connL.x - w / 2 + 26.5; 
-            y = connL.y + short / 2 + 25.5;
-
+            x = connL.x - w / 2 + (short * 0.53);
+            y = connL.y + short/2 + (short * 0.52);
+   //         y = connL.y + short / 2 + 25.5;
         // 108. Second turn positioning after double (bottom left)
         } else if (oldDir.y === 1) {            // Second turn on the bottom left.
-            x = connL.x + h;
-            y = connL.y - w / 2;
+            x = connL.x + h ;
+            y = connL.y - w/2 ;  // Position above the connection point going up
         }
     
     // 109. Regular turn positioning (not after double)
@@ -1108,12 +1107,12 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
         // 110. First turn positioning (regular)
         if (oldDir.x === -1) {
             x = connL.x - w - gap;
-            y = connL.y - h / 2 + 25;
+            y = connL.y - h / 2 + (short * 0.5);
 
         // 111. Second turn positioning (regular)
         } else if (oldDir.y === 1) {
             y = connL.y + gap;
-            x = connL.x - (short / 2);
+            x = connL.x - short / 2;
         }
     }
 
@@ -1146,9 +1145,10 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
         drawableTiles[i] = { domino, x, y, w, h, isReversed };
 
         // 120. Update connection point based on domino direction
-        if (dirL.x === 1) { connL = { x: x + w, y: y + h / 2 }; }
+        if (dirL.x === 1) { connL = { x: x + w, y: y + h / 2 }; } // Rightward direction - connect at right edge
         else if (dirL.x === -1) { connL = { x: x, y: y + h / 2 }; }
         else if (dirL.y === 1) { connL = { x: x + w / 2, y: y + h }; }
+        else if (dirL.y === -1) { connL = { x: x + w / 2, y: y }; } // Upward direction - connect at top
         else { connL = { x: x + w / 2, y: y }; }
         
         // 121. Increment straight counter
