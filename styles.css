@@ -63,8 +63,8 @@ html, body {
 }
 
 #player-display-bottom {
-    width: 280px; /* Increased from 260px to accommodate tiny tiles */
-    height:90px;
+    width: 260px; /* Increased from 260px to accommodate tiny tiles */
+    height:70px;
     flex-direction: row;
     padding: 2px 4px; /* Reduced padding only for top/bottom */
 }
@@ -468,20 +468,22 @@ html, body {
 #chat-input-form input {
     flex-grow: 1;
     border: none;
-    padding: 8px;
+    padding: 6px;
     border-radius: 4px;
     background: #333;
     color: white;
     margin-right: 5px;
+    height: 30px;
 }
 
 #chat-input-form button {
     border: none;
     background: #007BFF;
     color: white;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
+    height: 30px;
 }
 
 /* Voice chat button styles */

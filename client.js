@@ -737,7 +737,7 @@ function updateScoreboard() {
 function drawMessages() {
     const messageDiv = document.getElementById('message-display');
     if (!messageDiv) return;
-    if (messageDisplay.text && millis() - messageDisplay.time < 5000) {
+    if (messageDisplay.text && millis() - messageDisplay.time < 4000) {
         messageDiv.innerText = messageDisplay.text;
         messageDiv.style.display = 'block';
     } else {
@@ -934,7 +934,7 @@ function drawBoard() {
     // 54. Set standard domino dimensions and spacing
     const long = 100*.95, short = 50*.95, gap = 2;
     // 55. Calculate board center Y position
-    const boardCenterY = height / 2 - 215;
+    const boardCenterY = height / 2 - 218;
 
     // 56. Find spinner tile index in the board array
     const spinnerIndex = board.findIndex(t => t.left === spinnerTile.left && t.right === spinnerTile.right);
@@ -944,13 +944,16 @@ function drawBoard() {
     // 58. Initialize array to store drawable tile data
     let drawableTiles = new Array(board.length);
 
-    // 59. Set spinner tile dimensions (vertical orientation)
-    const spinnerW = short, spinnerH = long;
-    // 60. Calculate spinner tile X position (centered horizontally)
+    // 59. Check if spinner tile is a double to determine orientation
+    const isSpinnerDouble = spinnerTile.left === spinnerTile.right;
+    // 60. Set spinner tile dimensions (horizontal for non-doubles, vertical for doubles)
+    const spinnerW = isSpinnerDouble ? short : long;
+    const spinnerH = isSpinnerDouble ? long : short;
+    // 61. Calculate spinner tile X position (centered horizontally)
     const spinnerX = width / 2 - spinnerW / 2;
-    // 61. Calculate spinner tile Y position
+    // 62. Calculate spinner tile Y position
     const spinnerY = boardCenterY - spinnerH / 2;
-    // 62. Store spinner tile drawable data
+    // 63. Store spinner tile drawable data
     drawableTiles[spinnerIndex] = { domino: spinnerTile, x: spinnerX, y: spinnerY, w: spinnerW, h: spinnerH, isReversed: false };
 
 
@@ -958,8 +961,15 @@ function drawBoard() {
 
 
 // --- Right Side of Spinner ---
-// 94. Initialize right side connection point at spinner's right edge
-let connR = { x: spinnerX + spinnerW, y: spinnerY + spinnerH / 2 };
+// 94. Initialize right side connection point based on spinner orientation
+let connR;
+if (isSpinnerDouble) {
+    // For double (vertical) spinner: connect at right edge, middle height
+    connR = { x: spinnerX + spinnerW, y: spinnerY + spinnerH / 2 };
+} else {
+    // For non-double (horizontal) spinner: connect at right edge, middle height
+    connR = { x: spinnerX + spinnerW, y: spinnerY + spinnerH / 2 };
+}
 // 95. Set initial direction vector pointing right
 let dirR = { x: 1, y: 0 };
 // 96. Initialize counters for right side layout logic
@@ -1019,7 +1029,7 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
 
         // 112. Increment turn counter and update settings
         turnCountR++;
-        turnAfterR = 4;
+        turnAfterR = 3;
         straightCountR = 0;
 
     // 113. Straight line positioning (no turn)
@@ -1059,8 +1069,15 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
 
 
     // --- Left Side of Spinner ---
-    // 94. Initialize left side connection point at spinner's left edge
-    let connL = { x: spinnerX, y: spinnerY + spinnerH / 2 };
+    // 94. Initialize left side connection point based on spinner orientation
+    let connL;
+    if (isSpinnerDouble) {
+        // For double (vertical) spinner: connect at left edge, middle height
+        connL = { x: spinnerX, y: spinnerY + spinnerH / 2 };
+    } else {
+        // For non-double (horizontal) spinner: connect at left edge, middle height
+        connL = { x: spinnerX, y: spinnerY + spinnerH / 2 };
+    }
     // 95. Set initial direction vector pointing left
     let dirL = { x: -1, y: 0 };
     // 96. Initialize counters for left side layout logic
@@ -1163,7 +1180,7 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
             let isHighlighted = false;
             // 124. Check if this tile should be highlighted (recently played)
             if (lastPlayedHighlight.tile && 
-                millis() - lastPlayedHighlight.timestamp < 2500 &&
+                millis() - lastPlayedHighlight.timestamp < 3000 &&
                 t.domino.left === lastPlayedHighlight.tile.left && 
                 t.domino.right === lastPlayedHighlight.tile.right) {
                 isHighlighted = true;
@@ -1237,13 +1254,13 @@ async function startVoiceRecording() {
         
         mediaRecorder.start();
         isRecording = true;
-        console.log("🎤 Recording started...");
+        console.log("🎤 Grabando...");
         
         // Visual feedback
         const voiceBtn = document.getElementById('voice-chat-btn');
         if (voiceBtn) {
             voiceBtn.style.backgroundColor = '#ff4444';
-            voiceBtn.textContent = '🔴 Recording...';
+            voiceBtn.textContent = '🔴 Grabando...';
         }
         
     } catch (error) {
@@ -1262,7 +1279,7 @@ function stopVoiceRecording() {
         const voiceBtn = document.getElementById('voice-chat-btn');
         if (voiceBtn) {
             voiceBtn.style.backgroundColor = '#4CAF50';
-            voiceBtn.textContent = '🎤 Hold to Talk';
+            voiceBtn.textContent = '🎤 Presione y hable';
         }
     }
 }

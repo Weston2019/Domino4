@@ -263,14 +263,19 @@ function endRound(outcome) {
     if (scoreA >= POINTS_TO_WIN_MATCH || scoreB >= POINTS_TO_WIN_MATCH) {
         const winningTeamName = scoreA > scoreB ? 'Team A' : 'Team B';
         const winningTeamKey = scoreA > scoreB ? 'teamA' : 'teamB';
+        const losingTeamScore = scoreA > scoreB ? scoreB : scoreA;
+        
+        // Implement shutout rule: 2 points if opposing team has 0 points, otherwise 1 point
+        const matchPoints = losingTeamScore === 0 ? 2 : 1;
         
         gameState.teams[winningTeamKey].forEach(playerName => {
             if (gameState.playerStats[playerName]) {
-                gameState.playerStats[playerName].matchesWon++;
+                gameState.playerStats[playerName].matchesWon += matchPoints;
             }
         });
         
-        matchOverMessage = `\n${winningTeamName} gana el match ${scoreA} a ${scoreB}!`;
+        const shutoutMessage = losingTeamScore === 0 ? ` (Shutout: +${matchPoints} points!)` : '';
+        matchOverMessage = `\n${winningTeamName} gana el match ${scoreA} a ${scoreB}!${shutoutMessage}`;
 
         // DO NOT RESET STATE HERE. Wait for players to be ready.
         // Set flags to show the match over screen on the client.
