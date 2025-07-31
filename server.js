@@ -92,7 +92,7 @@ function findOrCreateRoom(playerName = null) {
     }
     
     // Create new room if all are full
-    const newRoomId = `Sala ${nextRoomId++}`;
+    const newRoomId = `Sala-${nextRoomId++}`;
     const newRoom = createGameRoom(newRoomId);
     gameRooms.set(newRoomId, newRoom);
     console.log(`[ROOM SYSTEM] Created new room: ${newRoomId}`);

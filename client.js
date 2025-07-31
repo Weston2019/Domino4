@@ -1,9 +1,43 @@
 // =============================================================================
-// == FINAL LABELED client.js        7/29/2025                                         ==
+// == FINAL LABELED client.js        7/31/2025                                         ==
 // =============================================================================
 // This file handles all client-side logic, including rendering the game with
 // p5.js, communicating with the server via Socket.IO, and managing user input.
 // =============================================================================
+
+
+// Fetch and display available rooms in the sign-in page
+function fetchAndShowRooms() {
+  fetch('/active-rooms')
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById('available-rooms');
+      if (!container) return;
+      if (!data.rooms || data.rooms.length === 0) {
+        container.innerHTML = '<span style="color:#888;">No hay salas activas</span>';
+        return;
+      }
+      container.innerHTML = '<b>Salas Disponibles:</b> ' + data.rooms.map(room => {
+        const isFull = room.connectedCount >= 4;
+        const roomLabel = room.roomId.replace(' ', '-');
+        if (isFull) {
+          return `<span class="room-chip room-full" data-room="${room.roomId}" style="background:#888;color:#fff;opacity:0.5;cursor:not-allowed;pointer-events:none;">${roomLabel} (Llena)</span>`;
+        } else {
+          return `<span class="room-chip" data-room="${room.roomId}">${roomLabel} (${room.connectedCount}/4)</span>`;
+        }
+      }).join(' ');
+      // Add click handler to fill room input
+      Array.from(container.getElementsByClassName('room-chip')).forEach(el => {
+        if (!el.classList.contains('room-full')) {
+          el.onclick = function() {
+            const input = document.getElementById('room-input');
+            if (input) input.value = this.getAttribute('data-room');
+          };
+        }
+      });
+    });
+}
+document.addEventListener('DOMContentLoaded', fetchAndShowRooms);
 
 
 // =============================================================================
@@ -69,7 +103,7 @@ function setup() {
         newRoundContainer.style.zIndex = '-9999';
     }
     
-    setupLobby(); 
+    setupLobby();
     setupButtonListeners();
 }
 
@@ -79,12 +113,7 @@ function setup() {
 function draw() {
     try {
         background(0, 100, 0);
-        // Always update points objective display every frame
-        const pointsObjDiv = document.getElementById('points-objective');
-        if (pointsObjDiv && gameState && gameState.targetScore) {
-            pointsObjDiv.textContent = 'Puntaje objetivo: ' + gameState.targetScore;
-            pointsObjDiv.style.display = 'inline-block';
-        }
+        // (Removed points-objective update here; now handled by updateRoomInfo for compact legend)
         updateUI();
         updatePlayersUI();
         updateTeamInfo();
@@ -110,54 +139,13 @@ function draw() {
  * Sets up the initial name-entry lobby screen with avatar selection.
  */
 function setupLobby() {
+    // Hide the room-points-legend if present (so it doesn't overlap the lobby)
+    const legendDiv = document.getElementById('room-points-legend');
+    if (legendDiv) legendDiv.style.display = 'none';
     const lobbyContainer = document.getElementById('lobby-container');
     const nameInput = document.getElementById('name-input');
 
-    // --- Active Rooms List ---
-    let activeRoomsDiv = document.getElementById('active-rooms-list');
-    if (!activeRoomsDiv) {
-        activeRoomsDiv = document.createElement('div');
-        activeRoomsDiv.id = 'active-rooms-list';
-        activeRoomsDiv.style.margin = '10px 0 0 0';
-        activeRoomsDiv.style.fontSize = '13px';
-        activeRoomsDiv.style.maxWidth = '100%';
-        activeRoomsDiv.style.width = '100%';
-        activeRoomsDiv.style.display = 'flex';
-        activeRoomsDiv.style.flexWrap = 'nowrap';
-        activeRoomsDiv.style.overflowX = 'auto';
-        activeRoomsDiv.style.gap = '6px';
-        activeRoomsDiv.style.justifyContent = 'flex-start';
-        activeRoomsDiv.style.alignItems = 'center';
-        activeRoomsDiv.style.whiteSpace = 'nowrap';
-        // Insert above name input
-        if (lobbyContainer && nameInput) {
-            lobbyContainer.insertBefore(activeRoomsDiv, nameInput);
-        } else if (lobbyContainer) {
-            lobbyContainer.appendChild(activeRoomsDiv);
-        }
-    }
-
-    // Fetch and display active rooms
-    fetch('/active-rooms').then(r => r.json()).then(data => {
-        if (!data.rooms || data.rooms.length === 0) {
-            activeRoomsDiv.innerHTML = '<span style="color:#888">No hay salas activas</span>';
-            return;
-        }
-        activeRoomsDiv.innerHTML =
-            '<b>Salas activas:</b> ' +
-            data.rooms.map(room => {
-                if (room.connectedCount >= 4) {
-                    // Full room: show as disabled
-                    return `<span style=\"background:#eee;border:1px solid #ccc;padding:2px 8px;border-radius:8px;text-decoration:none;color:#aaa;display:inline-block;min-width:60px;text-align:center;font-weight:bold;opacity:0.5;cursor:not-allowed;\">${room.roomId} (Llena)</span>`;
-                } else {
-                    // Joinable room: clickable
-                    return `<a href=\"#\" style=\"background:#f5f5f5;border:1px solid #bbb;padding:2px 8px;border-radius:8px;text-decoration:none;color:#333;display:inline-block;min-width:60px;text-align:center;font-weight:bold;\" onclick=\\\"document.getElementById('room-input').value='${room.roomId}';return false;\\\">${room.roomId} (${room.connectedCount}/4)</a>`;
-                }
-            }).join(' ') +
-            '<span style="color:#888;margin-left:12px;font-size:12px;">(Si no seleccionas sala, se te asigna la primera disponible)</span>';
-    }).catch(() => {
-        activeRoomsDiv.innerHTML = '<span style="color:#888">No se pudo cargar salas</span>';
-    });
+    // (Old activeRoomsDiv and fetch logic removed)
     // SUPER AGGRESSIVE: Hide all possible dialog containers
     const elementsToHide = [
         'new-round-container',
@@ -441,6 +429,12 @@ function setupLobby() {
         const targetScoreSelect = document.getElementById('target-score');
         const targetScore = targetScoreSelect ? parseInt(targetScoreSelect.value, 10) : 70;
         if (name) {
+            // Hide lobby and show game UI immediately
+            const lobby = document.getElementById('lobby-container');
+            const gameUI = document.getElementById('game-ui');
+            if (lobby) lobby.style.display = 'none';
+            if (gameUI) gameUI.style.display = 'block';
+
             // Don't save name to localStorage - keep it fresh each session
             // localStorage.setItem('domino_player_name', name);
             // ALWAYS check for avatar file FIRST - highest priority
@@ -448,13 +442,10 @@ function setupLobby() {
             const avatarFilePath = `assets/icons/${name}_avatar.jpg`;
             testImg.onload = function() {
                 console.log('🎯 PRIORITY 1: Found avatar file for', name, '- using file (ignoring localStorage)');
-                lobbyContainer.style.display = 'none';
-                // Send with null avatar data - server will set type='file' 
                 connectToServer(name, null, roomId, targetScore); 
             };
             testImg.onerror = function() {
                 console.log('ℹ️ No avatar file for', name, '- checking localStorage and selections');
-                lobbyContainer.style.display = 'none';
                 // PRIORITY 2: Use selected avatar (custom upload or emoji)
                 const avatarData = {
                     type: customAvatarData ? 'custom' : 'emoji',
@@ -582,24 +573,19 @@ function connectToServer(playerName, avatarData, roomId) {
     socket.on('connect', () => {
         console.log("Connected to server.");
         socket.emit('setPlayerName', { name: playerName, avatar: avatarData, roomId: roomId, targetScore: targetScore });
+
+        // Hide lobby and show game UI when connected
+        const lobby = document.getElementById('lobby-container');
+        const gameUI = document.getElementById('game-ui');
+        if (lobby) lobby.style.display = 'none';
+        if (gameUI) gameUI.style.display = 'block';
     });
 
     socket.on('playerAssigned', (name) => { myJugadorName = name; });
 
     socket.on('gameState', (state) => {
         gameState = state;
-        // Update points objective display in game UI
-        if (state.targetScore) {
-            if (typeof updatePointsObjective === 'function') {
-                updatePointsObjective(state.targetScore);
-            } else {
-                const pointsObjDiv = document.getElementById('points-objective');
-                if (pointsObjDiv) {
-                    pointsObjDiv.textContent = 'Puntaje objetivo: ' + state.targetScore;
-                    pointsObjDiv.style.display = 'inline-block';
-                }
-            }
-        }
+        // (Removed points-objective update here; now handled by updateRoomInfo for compact legend)
         const newRoundContainer = document.getElementById('new-round-container');
         if (!newRoundContainer) return;
         // TRIPLE CHECK: Only show round dialogs if we have a player assigned AND are connected
@@ -1157,6 +1143,7 @@ function updateTeamInfo() {
         return player ? player.displayName : internalName;
     };
 
+    // Only show match/team info as before, no room/points legend here
     let teamsHtml = `<b>Match ${matchNumber || 1}</b><br>`;
     if (teams.teamA && teams.teamA.length > 0) { teamsHtml += `<b>Equipo A:</b> ${teams.teamA.map(getDisplayName).join(' & ')}<br>`; }
     if (teams.teamB && teams.teamB.length > 0) { teamsHtml += `<b>Equipo B:</b> ${teams.teamB.map(getDisplayName).join(' & ')}<br>`; }
@@ -1164,23 +1151,77 @@ function updateTeamInfo() {
 }
 
 function updateRoomInfo() {
-    const roomNameSpan = document.getElementById('room-name');
-    const pointsObjSpan = document.getElementById('points-objective');
-    if (!roomNameSpan || !pointsObjSpan) return;
-    console.log('[DEBUG] updateRoomInfo: gameState.targetScore =', gameState.targetScore);
-    if (gameState.roomId) {
-        roomNameSpan.textContent = gameState.roomId;
-        if (gameState.targetScore) {
-            pointsObjSpan.textContent = 'A ' + gameState.targetScore;
-            pointsObjSpan.style.display = 'inline-block';
-        } else {
-            pointsObjSpan.textContent = '';
-            pointsObjSpan.style.display = 'none';
+    // If the lobby is visible, hide the legend and return
+    const lobby = document.getElementById('lobby-container');
+    var legendDiv = document.getElementById('room-points-legend');
+    if (lobby && window.getComputedStyle(lobby).display !== 'none') {
+        if (legendDiv) legendDiv.style.display = 'none';
+        return;
+    }
+    // Remove legacy points-objective element if present
+    const legacyPointsObj = document.getElementById('points-objective');
+    if (legacyPointsObj && legacyPointsObj.parentNode) {
+        legacyPointsObj.parentNode.removeChild(legacyPointsObj);
+    }
+    // Aggressively remove or hide any old room/points/objective elements except the new legend
+    // Only remove elements whose id or class STARTS WITH room, points, or objective, and never remove team-info
+    const aggressiveSelectors = [
+        '[id^="room"]:not(#room-points-legend):not(#team-info)',
+        '[id^="points"]:not(#room-points-legend):not(#team-info)',
+        '[id^="objective"]:not(#room-points-legend):not(#team-info)',
+        '[class^="room"]:not(.team-info)',
+        '[class^="points"]:not(.team-info)',
+        '[class^="objective"]:not(.team-info)'
+    ];
+    document.querySelectorAll(aggressiveSelectors.join(',')).forEach(el => {
+        if (el.id !== 'room-points-legend' && el.id !== 'team-info' && !el.classList.contains('team-info')) {
+            try {
+                el.parentNode && el.parentNode.removeChild(el);
+            } catch (e) {
+                el.style.display = 'none';
+            }
         }
+    });
+
+    // Place the room/points legend to the right of the Match info container
+    let matchDiv = document.getElementById('team-info');
+    if (!legendDiv) {
+        legendDiv = document.createElement('div');
+        legendDiv.id = 'room-points-legend';
+        legendDiv.style.position = 'absolute';
+        legendDiv.style.top = '';
+        legendDiv.style.left = '';
+        legendDiv.style.zIndex = '20';
+        legendDiv.style.background = 'rgba(0,0,0,0.18)'; // Subtle, light background for readability
+        legendDiv.style.color = '#fff';
+        legendDiv.style.fontWeight = 'bold';
+        legendDiv.style.fontSize = '18px';
+        legendDiv.style.padding = '2px 12px 2px 10px';
+        legendDiv.style.borderRadius = '7px';
+        legendDiv.style.boxShadow = '0 1px 4px rgba(0,0,0,0.10)'; // Very light shadow
+        legendDiv.style.pointerEvents = 'none';
+        legendDiv.style.userSelect = 'none';
+        document.body.appendChild(legendDiv);
+    }
+    // Position legendDiv to the right of matchDiv
+    if (matchDiv) {
+        const rect = matchDiv.getBoundingClientRect();
+        legendDiv.style.top = `${rect.top + window.scrollY}px`;
+        legendDiv.style.left = `${rect.right + 16 + window.scrollX}px`;
     } else {
-        roomNameSpan.textContent = '';
-        pointsObjSpan.textContent = '';
-        pointsObjSpan.style.display = 'none';
+        // fallback to top left if matchDiv not found
+        legendDiv.style.top = '8px';
+        legendDiv.style.left = '12px';
+    }
+    if (gameState && gameState.roomId && gameState.targetScore) {
+        legendDiv.textContent = `${gameState.roomId.replace(' ', '-')} A ${gameState.targetScore} puntos`;
+        legendDiv.style.display = 'block';
+    } else if (gameState && gameState.roomId) {
+        legendDiv.textContent = gameState.roomId.replace(' ', '-');
+        legendDiv.style.display = 'block';
+    } else {
+        legendDiv.textContent = '';
+        legendDiv.style.display = 'none';
     }
 }
 

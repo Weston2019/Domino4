@@ -11,34 +11,39 @@
         <h2>Crear Su Perfil</h2>
         <button id="show-rules-btn">📖 Reglas del Juego</button>
         <div id="profile-status"></div>
-        <div id="avatar-selection">
-            <h3>Seleccione Su Avatar</h3>
-            <div id="avatar-grid">
-                <div class="avatar-option" data-avatar="🎭">🎭</div>
-                <div class="avatar-option" data-avatar="🎪">🎪</div>
-                <div class="avatar-option" data-avatar="🎨">🎨</div>
-                <div class="avatar-option selected" data-avatar="🎯">🎯</div>
-                <div class="avatar-option" data-avatar="🎲">🎲</div>
-                <div class="avatar-option" data-avatar="🎮">🎮</div>
-                <div class="avatar-option" data-avatar="🎵">🎵</div>
-                <div class="avatar-option" data-avatar="🎸">🎸</div>
-                <div class="avatar-option" data-avatar="⚡">⚡</div>
-                <div class="avatar-option" data-avatar="🔥">🔥</div>
-                <div class="avatar-option" data-avatar="💎">💎</div>
-                <div class="avatar-option" data-avatar="⭐">⭐</div>
-                <div class="avatar-option" data-avatar="🌟">🌟</div>
-                <div class="avatar-option" data-avatar="🏆">🏆</div>
-                <div class="avatar-option" data-avatar="👑">👑</div>
-                <div class="avatar-option" data-avatar="🎊">🎊</div>
+        <div class="avatar-flex-row-wrapper" style="position:relative;">
+            <div class="avatar-flex-row">
+                <div id="avatar-selection">
+                    <h3>Seleccione Su Avatar</h3>
+                    <div id="avatar-grid">
+                        <div class="avatar-option" data-avatar="🎭">🎭</div>
+                        <div class="avatar-option" data-avatar="🎪">🎪</div>
+                        <div class="avatar-option" data-avatar="🎨">🎨</div>
+                        <div class="avatar-option selected" data-avatar="🎯">🎯</div>
+                        <div class="avatar-option" data-avatar="🎲">🎲</div>
+                        <div class="avatar-option" data-avatar="🎮">🎮</div>
+                        <div class="avatar-option" data-avatar="🎵">🎵</div>
+                        <div class="avatar-option" data-avatar="🎸">🎸</div>
+                        <div class="avatar-option" data-avatar="⚡">⚡</div>
+                        <div class="avatar-option" data-avatar="🔥">🔥</div>
+                        <div class="avatar-option" data-avatar="💎">💎</div>
+                        <div class="avatar-option" data-avatar="⭐">⭐</div>
+                        <div class="avatar-option" data-avatar="🌟">🌟</div>
+                        <div class="avatar-option" data-avatar="🏆">🏆</div>
+                        <div class="avatar-option" data-avatar="👑">👑</div>
+                        <div class="avatar-option" data-avatar="🎊">🎊</div>
+                    </div>
+                    <div id="custom-avatar-section">
+                        <h4>O Suba Su Propia Imagen</h4>
+                        <label for="avatar-upload" class="custom-file-upload">
+                            📁 Seleccionar Archivo
+                        </label>
+                        <input type="file" id="avatar-upload" accept="image/*" title="Suba su avatar personalizado">
+                        <div id="custom-avatar-preview"></div>
+                    </div>
+                </div>
             </div>
-            <div id="custom-avatar-section">
-                <h4>O Suba Su Propia Imagen</h4>
-                <label for="avatar-upload" class="custom-file-upload">
-                    📁 Seleccionar Archivo
-                </label>
-                <input type="file" id="avatar-upload" accept="image/*" title="Suba su avatar personalizado">
-                <div id="custom-avatar-preview"></div>
-            </div>
+            <div id="available-rooms"></div>
         </div>
         <input type="text" id="name-input" placeholder="Su Nombre o Iniciales" maxlength="12">
         <div class="flex-row">
@@ -58,49 +63,43 @@
         <!-- Game Rules Modal -->
         <!-- Game Rules Modal moved to end of body -->
     </div>
-
     <div id="canvas-container"></div>
-
     <div id="game-ui">
-        <div id="player-display-bottom" class="player-display"></div>
-        <div id="player-display-left" class="player-display vertical-layout"></div>
-        <div id="player-display-top" class="player-display"></div>
-        <div id="player-display-right" class="player-display vertical-layout"></div>
+        <div class="game-ui-top-row">
+            <div class="game-ui-main">
+                <div class="team-room-row">
+                    <div id="team-info"></div>
 
-        <div id="team-info"></div>
-        <div class="flex-row-room">
-            <div id="room-info">
-                <span id="room-name">Sala 1</span>
-                <span id="points-objective">Puntaje objetivo: 70</span>
+                </div>
+                <div id="player-display-bottom" class="player-display"></div>
+                <div id="player-display-left" class="player-display vertical-layout"></div>
+                <div id="player-display-top" class="player-display"></div>
+                <div id="player-display-right" class="player-display vertical-layout"></div>
+                <div id="scoreboard"></div>
+                <div id="matches-won-container"></div>
+                <div id="restart-game-container">
+                    <button id="restart-game-btn">🔄 Reiniciar Juego</button>
+                </div>
+                <div id="message-display"></div>
+                <div id="game-buttons">
+                    <button id="playLeftBtn">Izquierda</button>
+                    <button id="playRightBtn">Derecha</button>
+                    <button id="passBtn">Paso</button>
+                </div>
+                <div id="new-round-container"> 
+                    <div id="round-over-message"></div>
+                    <button id="newRoundBtn">Empezar Mano Nueva</button>
+                </div>
+                <div id="chat-container">
+                    <div id="chat-messages"></div>
+                    <form id="chat-input-form">
+                        <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                        <button type="submit">Send</button>
+                        <button id="voice-chat-btn" type="button">🎤Presione y hable
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
-        <div id="scoreboard"></div>
-        <div id="matches-won-container"></div>
-
-        <div id="restart-game-container">
-            <button id="restart-game-btn">🔄 Reiniciar Juego</button>
-        </div>
-
-        <div id="message-display"></div>
-        <div id="game-buttons">
-            <button id="playLeftBtn">Izquierda</button>
-            <button id="playRightBtn">Derecha</button>
-            <button id="passBtn">Paso</button>
-        </div>
-        <div id="new-round-container"> 
-    <div id="round-over-message"></div>
-    <button id="newRoundBtn">Empezar Mano Nueva</button>
-</div>
-
-        <div id="chat-container">
-            <div id="chat-messages"></div>
-            <form id="chat-input-form">
-                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
-                <button type="submit">Send</button>
-                <button id="voice-chat-btn" type="button">🎤Presione y hable
-                    
-                </button>
-            </form>
         </div>
     </div>
 
@@ -118,7 +117,8 @@
                 <li>Debe colocar una ficha que coincida con los extremos del tablero.</li>
                 <li>Si no puede jugar, debe pasar su turno.</li>
                 <li>Gana la mano el primer equipo en quedarse sin fichas, o el equipo con menos puntos si el juego se cierra.</li>
-                <li>El primer equipo en alcanzar el puntaje (70) objetivo gana el juego.</li>
+                <li>Si hay cierre y empate en puntos, nadie gana y sale el que tenga el doble 6 en la proxima mano</li>
+                <li>El primer equipo en alcanzar el puntaje (70) objetivo gana el juego, este valor se pude cambiar al registrarse.</li>
             </ol>
             <p>Consulte las reglas completas con el organizador o en línea.</p>
         </div>
@@ -129,10 +129,22 @@
         var showBtn = document.getElementById('show-rules-btn');
         var modal = document.getElementById('rules-modal');
         var closeBtn = document.getElementById('close-rules-btn');
-        if (showBtn && modal && closeBtn) {
-            showBtn.onclick = function() { modal.style.display = 'flex'; };
-            closeBtn.onclick = function() { modal.style.display = 'none'; };
-            modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+        var lobby = document.getElementById('lobby-container');
+        if (showBtn && modal && closeBtn && lobby) {
+            showBtn.onclick = function() {
+                modal.classList.add('show');
+                lobby.classList.add('modal-open');
+            };
+            closeBtn.onclick = function() {
+                modal.classList.remove('show');
+                lobby.classList.remove('modal-open');
+            };
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                    lobby.classList.remove('modal-open');
+                }
+            };
         }
     });
     </script>
@@ -140,27 +152,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/addons/p5.sound.min.js"></script>
  
     <script src="/client.js"></script>
-    <script>
-    // Display the points objective in the game UI
-    function updatePointsObjective(points) {
-        var el = document.getElementById('points-objective');
-        if (el && points) {
-            el.textContent = 'Puntaje objetivo: ' + points;
-            el.style.display = 'inline-block';
-        } else if (el) {
-            el.textContent = '';
-            el.style.display = 'none';
-        }
-    }
-    // Listen for game state or room info updates from client.js
-    // You may need to call updatePointsObjective from your client.js when the game starts or room info is updated.
-    // Example for quick test (remove if handled in client.js):
-    window.addEventListener('DOMContentLoaded', function() {
-        // Try to get points from a global gameState or similar object if available
-        if (window.gameState && window.gameState.targetScore) {
-            updatePointsObjective(window.gameState.targetScore);
-        }
-    });
-    </script>
+
 </body>
 </html>

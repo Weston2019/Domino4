@@ -1,3 +1,277 @@
+/* Flex row for team info and room info inline */
+.team-room-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 4px;
+}
+
+.room-info-side-inline {
+  background: #222;
+  color: #b6fcb6;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 1.05em;
+  box-shadow: 0 2px 8px #000a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 120px;
+  max-width: 200px;
+}
+/* Wrapper for avatar selection and available rooms */
+.avatar-flex-row-wrapper {
+  position: relative;
+  width: fit-content;
+  margin: 0 auto 8px auto;
+}
+
+/* Place available rooms absolutely to the right of avatar selection */
+#available-rooms {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 32px;
+  z-index: 2;
+  /* rest of previous styles remain */
+}
+/* Room info panel in lobby (right of avatar selection) */
+.lobby-room-info {
+  min-width: 140px;
+  max-width: 200px;
+  background: #222;
+  color: #b6fcb6;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 1.05em;
+  margin-left: 32px;
+  margin-top: 0;
+  box-shadow: 0 2px 8px #000a;
+  text-align: left;
+  line-height: 1.5;
+  align-self: flex-start;
+}
+
+/* Available rooms list next to avatar selection in lobby */
+#available-rooms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 120px;
+  max-width: 180px;
+  background: #222;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.95em;
+  color: #b6fcb6;
+  box-shadow: 0 2px 8px #000a;
+  margin-left: 32px;
+  margin-top: 0;
+  height: fit-content;
+}
+
+#available-rooms .room-chip {
+  background: #333;
+  color: #b6fcb6;
+  border-radius: 8px;
+  padding: 3px 10px;
+  margin-bottom: 6px;
+  margin-right: 0;
+  font-size: 0.98em;
+  cursor: pointer;
+  border: 1px solid #444;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+#available-rooms .room-chip:last-child {
+  margin-bottom: 0;
+}
+#available-rooms .room-chip:hover {
+  background: #2e6;
+  color: #111;
+}
+/* Game UI top row flex for room info on right */
+.game-ui-top-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  gap: 32px;
+}
+.game-ui-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.room-info-side {
+  min-width: 140px;
+  max-width: 200px;
+  background: #222;
+  color: #b6fcb6;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 1.05em;
+  margin-top: 12px;
+  box-shadow: 0 2px 8px #000a;
+  text-align: left;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .game-ui-top-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .room-info-side {
+    margin-top: 0;
+    margin-bottom: 12px;
+    align-self: flex-end;
+  }
+}
+/* Flex row for avatar and available rooms */
+.avatar-flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 8px;
+}
+
+#avatar-selection {
+  min-width: 320px;
+  max-width: 380px;
+}
+
+#available-rooms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 120px;
+  max-width: 180px;
+  background: #222;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.95em;
+  color: #b6fcb6;
+  box-shadow: 0 2px 8px #000a;
+  margin: 0;
+  height: fit-content;
+}
+
+#available-rooms .room-chip {
+  background: #333;
+  color: #b6fcb6;
+  border-radius: 8px;
+  padding: 3px 10px;
+  margin-bottom: 6px;
+  margin-right: 0;
+  font-size: 0.98em;
+  cursor: pointer;
+  border: 1px solid #444;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+#available-rooms .room-chip:last-child {
+  margin-bottom: 0;
+}
+#available-rooms .room-chip:hover {
+  background: #2e6;
+  color: #111;
+}
+#available-rooms {
+  font-size: 14px;
+  margin-bottom: 6px;
+  background: #222;
+  color: #bfc;
+  border-radius: 8px;
+  padding: 6px 8px;
+  max-width: 320px;
+  width: 95%;
+  margin: 0 auto 8px auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.room-chip {
+  background: #333;
+  color: #bfc;
+  border-radius: 6px;
+  padding: 2px 10px;
+  margin: 2px 2px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #444;
+  transition: background 0.2s, color 0.2s;
+}
+.room-chip:hover {
+  background: #007bff;
+  color: #fff;
+}
+#rules-modal-content {
+  background: #fff;
+  color: #222;
+  padding: 14px 12px 10px 12px;
+  max-width: 340px;
+  width: 98vw;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px #0006;
+  position: relative;
+  z-index: 100001;
+  text-align: left;
+}
+#rules-modal-content h2 {
+  margin-top: 0;
+  color: #222;
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+#rules-modal-content ol {
+  font-size: 13px;
+  line-height: 1.25;
+  padding-left: 16px;
+  color: #222;
+  margin-bottom: 8px;
+}
+#rules-modal-content p {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+}
+#close-rules-btn {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #222;
+}
+#rules-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.65);
+  z-index: 100000;
+  align-items: center;
+  justify-content: center;
+}
+#lobby-container.modal-open {
+  pointer-events: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  opacity: 0.7;
+}
+#rules-modal.show {
+  display: flex;
+}
 .puntaje-label {
   margin-left: 16px;
 }
