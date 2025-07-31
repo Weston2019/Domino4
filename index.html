@@ -8,9 +8,55 @@
 </head>
 <body>
     <div id="lobby-container">
-        <h2>Ingrese su Nombre</h2>
+        <h2>Crear Su Perfil</h2>
+        <button id="show-rules-btn">📖 Reglas del Juego</button>
+        <div id="profile-status"></div>
+        <div id="avatar-selection">
+            <h3>Seleccione Su Avatar</h3>
+            <div id="avatar-grid">
+                <div class="avatar-option" data-avatar="🎭">🎭</div>
+                <div class="avatar-option" data-avatar="🎪">🎪</div>
+                <div class="avatar-option" data-avatar="🎨">🎨</div>
+                <div class="avatar-option selected" data-avatar="🎯">🎯</div>
+                <div class="avatar-option" data-avatar="🎲">🎲</div>
+                <div class="avatar-option" data-avatar="🎮">🎮</div>
+                <div class="avatar-option" data-avatar="🎵">🎵</div>
+                <div class="avatar-option" data-avatar="🎸">🎸</div>
+                <div class="avatar-option" data-avatar="⚡">⚡</div>
+                <div class="avatar-option" data-avatar="🔥">🔥</div>
+                <div class="avatar-option" data-avatar="💎">💎</div>
+                <div class="avatar-option" data-avatar="⭐">⭐</div>
+                <div class="avatar-option" data-avatar="🌟">🌟</div>
+                <div class="avatar-option" data-avatar="🏆">🏆</div>
+                <div class="avatar-option" data-avatar="👑">👑</div>
+                <div class="avatar-option" data-avatar="🎊">🎊</div>
+            </div>
+            <div id="custom-avatar-section">
+                <h4>O Suba Su Propia Imagen</h4>
+                <label for="avatar-upload" class="custom-file-upload">
+                    📁 Seleccionar Archivo
+                </label>
+                <input type="file" id="avatar-upload" accept="image/*" title="Suba su avatar personalizado">
+                <div id="custom-avatar-preview"></div>
+            </div>
+        </div>
         <input type="text" id="name-input" placeholder="Su Nombre o Iniciales" maxlength="12">
-        <button id="set-name-btn">Registrese</button>
+        <div class="flex-row">
+            <input type="text" id="room-input" placeholder="Sala nombre(opcional)">
+            <label for="target-score" class="puntaje-label">Puntaje:</label>
+            <select id="target-score" class="puntaje-select">
+                <option value="70" selected>70</option>
+                <option value="100">100</option>
+                <option value="50">50</option>
+                <option value="30">30</option>
+            </select>
+        </div>
+        <div id="profile-actions">
+            <button id="set-name-btn">Entrar al Juego</button>
+            <button id="clear-profile-btn" type="button">Borrar Perfil Guardado</button>
+        </div>
+        <!-- Game Rules Modal -->
+        <!-- Game Rules Modal moved to end of body -->
     </div>
 
     <div id="canvas-container"></div>
@@ -22,6 +68,12 @@
         <div id="player-display-right" class="player-display vertical-layout"></div>
 
         <div id="team-info"></div>
+        <div class="flex-row-room">
+            <div id="room-info">
+                <span id="room-name">Sala 1</span>
+                <span id="points-objective">Puntaje objetivo: 70</span>
+            </div>
+        </div>
         <div id="scoreboard"></div>
         <div id="matches-won-container"></div>
 
@@ -53,8 +105,62 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Game Rules Modal moved here for visibility -->
+    <div id="rules-modal">
+        <div id="rules-modal-content">
+            <button id="close-rules-btn">✖</button>
+            <h2>Reglas del Juego</h2>
+            <ol>
+                <li>El juego es para 4 jugadores en equipos de 2.</li>
+                <li>Cada jugador recibe 7 fichas de dominó.</li>
+                <li>El jugador con el doble 6 inicia la partida.</li>
+                <li>Los turnos son en sentido contra del reloj.</li>
+                <li>Debe colocar una ficha que coincida con los extremos del tablero.</li>
+                <li>Si no puede jugar, debe pasar su turno.</li>
+                <li>Gana la mano el primer equipo en quedarse sin fichas, o el equipo con menos puntos si el juego se cierra.</li>
+                <li>El primer equipo en alcanzar el puntaje (70) objetivo gana el juego.</li>
+            </ol>
+            <p>Consulte las reglas completas con el organizador o en línea.</p>
+        </div>
+    </div>
+    <script>
+    // Show/hide rules modal logic
+    document.addEventListener('DOMContentLoaded', function() {
+        var showBtn = document.getElementById('show-rules-btn');
+        var modal = document.getElementById('rules-modal');
+        var closeBtn = document.getElementById('close-rules-btn');
+        if (showBtn && modal && closeBtn) {
+            showBtn.onclick = function() { modal.style.display = 'flex'; };
+            closeBtn.onclick = function() { modal.style.display = 'none'; };
+            modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+        }
+    });
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/addons/p5.sound.min.js"></script>
+ 
     <script src="/client.js"></script>
+    <script>
+    // Display the points objective in the game UI
+    function updatePointsObjective(points) {
+        var el = document.getElementById('points-objective');
+        if (el && points) {
+            el.textContent = 'Puntaje objetivo: ' + points;
+            el.style.display = 'inline-block';
+        } else if (el) {
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+    }
+    // Listen for game state or room info updates from client.js
+    // You may need to call updatePointsObjective from your client.js when the game starts or room info is updated.
+    // Example for quick test (remove if handled in client.js):
+    window.addEventListener('DOMContentLoaded', function() {
+        // Try to get points from a global gameState or similar object if available
+        if (window.gameState && window.gameState.targetScore) {
+            updatePointsObjective(window.gameState.targetScore);
+        }
+    });
+    </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 // =============================================================================
-// == FINAL LABELED client.js        7/22/2025                                         ==
+// == FINAL LABELED client.js        7/29/2025                                         ==
 // =============================================================================
 // This file handles all client-side logic, including rendering the game with
 // p5.js, communicating with the server via Socket.IO, and managing user input.
@@ -78,10 +78,17 @@ function setup() {
  */
 function draw() {
     try {
-        background(0, 100, 0); 
+        background(0, 100, 0);
+        // Always update points objective display every frame
+        const pointsObjDiv = document.getElementById('points-objective');
+        if (pointsObjDiv && gameState && gameState.targetScore) {
+            pointsObjDiv.textContent = 'Puntaje objetivo: ' + gameState.targetScore;
+            pointsObjDiv.style.display = 'inline-block';
+        }
         updateUI();
         updatePlayersUI();
         updateTeamInfo();
+        updateRoomInfo();
         updateScoreboard();
         updateMatchesWon();
         if (gameState.board && gameState.board.length > 0) {
@@ -100,9 +107,57 @@ function draw() {
 // =============================================================================
 
 /**
- * Sets up the initial name-entry lobby screen.
+ * Sets up the initial name-entry lobby screen with avatar selection.
  */
 function setupLobby() {
+    const lobbyContainer = document.getElementById('lobby-container');
+    const nameInput = document.getElementById('name-input');
+
+    // --- Active Rooms List ---
+    let activeRoomsDiv = document.getElementById('active-rooms-list');
+    if (!activeRoomsDiv) {
+        activeRoomsDiv = document.createElement('div');
+        activeRoomsDiv.id = 'active-rooms-list';
+        activeRoomsDiv.style.margin = '10px 0 0 0';
+        activeRoomsDiv.style.fontSize = '13px';
+        activeRoomsDiv.style.maxWidth = '100%';
+        activeRoomsDiv.style.width = '100%';
+        activeRoomsDiv.style.display = 'flex';
+        activeRoomsDiv.style.flexWrap = 'nowrap';
+        activeRoomsDiv.style.overflowX = 'auto';
+        activeRoomsDiv.style.gap = '6px';
+        activeRoomsDiv.style.justifyContent = 'flex-start';
+        activeRoomsDiv.style.alignItems = 'center';
+        activeRoomsDiv.style.whiteSpace = 'nowrap';
+        // Insert above name input
+        if (lobbyContainer && nameInput) {
+            lobbyContainer.insertBefore(activeRoomsDiv, nameInput);
+        } else if (lobbyContainer) {
+            lobbyContainer.appendChild(activeRoomsDiv);
+        }
+    }
+
+    // Fetch and display active rooms
+    fetch('/active-rooms').then(r => r.json()).then(data => {
+        if (!data.rooms || data.rooms.length === 0) {
+            activeRoomsDiv.innerHTML = '<span style="color:#888">No hay salas activas</span>';
+            return;
+        }
+        activeRoomsDiv.innerHTML =
+            '<b>Salas activas:</b> ' +
+            data.rooms.map(room => {
+                if (room.connectedCount >= 4) {
+                    // Full room: show as disabled
+                    return `<span style=\"background:#eee;border:1px solid #ccc;padding:2px 8px;border-radius:8px;text-decoration:none;color:#aaa;display:inline-block;min-width:60px;text-align:center;font-weight:bold;opacity:0.5;cursor:not-allowed;\">${room.roomId} (Llena)</span>`;
+                } else {
+                    // Joinable room: clickable
+                    return `<a href=\"#\" style=\"background:#f5f5f5;border:1px solid #bbb;padding:2px 8px;border-radius:8px;text-decoration:none;color:#333;display:inline-block;min-width:60px;text-align:center;font-weight:bold;\" onclick=\\\"document.getElementById('room-input').value='${room.roomId}';return false;\\\">${room.roomId} (${room.connectedCount}/4)</a>`;
+                }
+            }).join(' ') +
+            '<span style="color:#888;margin-left:12px;font-size:12px;">(Si no seleccionas sala, se te asigna la primera disponible)</span>';
+    }).catch(() => {
+        activeRoomsDiv.innerHTML = '<span style="color:#888">No se pudo cargar salas</span>';
+    });
     // SUPER AGGRESSIVE: Hide all possible dialog containers
     const elementsToHide = [
         'new-round-container',
@@ -121,22 +176,376 @@ function setupLobby() {
         }
     });
     
-    const lobbyContainer = document.getElementById('lobby-container');
-    const nameInput = document.getElementById('name-input');
+    // (already declared above)
     const setNameBtn = document.getElementById('set-name-btn');
+    const avatarOptions = document.querySelectorAll('.avatar-option');
+    const avatarUpload = document.getElementById('avatar-upload');
+    const customAvatarPreview = document.getElementById('custom-avatar-preview');
+    // Room selection input (add this to your HTML if not present)
+    let roomInput = document.getElementById('room-input');
+    if (!roomInput) {
+        // Dynamically add if missing (for backward compatibility)
+        roomInput = document.createElement('input');
+        roomInput.type = 'text';
+        roomInput.id = 'room-input';
+        roomInput.placeholder = 'Sala nombre (opcional)';
+        roomInput.style.marginTop = '10px';
+        roomInput.style.width = '56%'; // 30% less than 80%
+        roomInput.style.minWidth = '180px';
+        // Only insertBefore if setNameBtn is a child of lobbyContainer
+        if (setNameBtn && setNameBtn.parentNode === lobbyContainer) {
+            lobbyContainer.insertBefore(roomInput, setNameBtn);
+        } else {
+            lobbyContainer.appendChild(roomInput);
+        }
+    } else {
+        roomInput.placeholder = 'Sala nombre (opcional)';
+        roomInput.style.width = '56%';
+        roomInput.style.minWidth = '190px';
+    }
+    
+    // ALWAYS start with empty name field (don't auto-fill old names)
+    nameInput.value = '';
+    nameInput.defaultValue = '';
+    nameInput.setAttribute('value', '');
+    console.log('✅ Cleared name input field');
+    
+    // Force clear any cached form data multiple times
+    setTimeout(() => {
+        nameInput.value = '';
+        nameInput.defaultValue = '';
+        nameInput.setAttribute('value', '');
+        console.log('✅ Double-cleared name input field');
+    }, 100);
+    
+    setTimeout(() => {
+        nameInput.value = '';
+        nameInput.defaultValue = '';
+        nameInput.setAttribute('value', '');
+        console.log('✅ Triple-cleared name input field');
+    }, 300);
+    
+    // Load saved avatar from localStorage (but NOT the name - keep it empty)
+    const savedAvatar = localStorage.getItem('domino_player_avatar');
+    
+    let selectedAvatar = '🎯'; // Default avatar (target emoji)
+    let customAvatarData = null;
+    
+    // Don't restore saved name - always start fresh
+    // if (savedName) {
+    //     nameInput.value = savedName;
+    // }
+    
+    // Reset all avatar selections first
+    avatarOptions.forEach(opt => opt.classList.remove('selected'));
+    customAvatarPreview.style.display = 'none';
+    
+    // PRIORITY 1: Check if user has an avatar file with their name first
+    const currentName = nameInput.value.trim();
+    if (currentName) {
+        // Try to find avatar file for this user
+        const testImg = new Image();
+        const avatarFilePath = `assets/icons/${currentName}_avatar.jpg`;
+        
+        testImg.onload = function() {
+            console.log('✅ Found avatar file for', currentName);
+            // Don't use localStorage - user has their own avatar file
+            selectedAvatar = null;
+            customAvatarData = null;
+            // The getPlayerIcon function will handle this
+        };
+        
+        testImg.onerror = function() {
+            console.log('ℹ️ No avatar file found for', currentName, ', using localStorage or default');
+            // PRIORITY 2: Restore saved avatar from localStorage
+            if (savedAvatar) {
+                try {
+                    const avatarData = JSON.parse(savedAvatar);
+                    if (avatarData.type === 'custom') {
+                        customAvatarData = avatarData.data;
+                        selectedAvatar = null;
+                        // Show preview
+                        customAvatarPreview.innerHTML = `<img src="${customAvatarData}" alt="Custom Avatar">`;
+                        customAvatarPreview.style.display = 'block';
+                        console.log('Restored custom avatar from localStorage');
+                    } else {
+                        selectedAvatar = avatarData.data;
+                        customAvatarData = null;
+                        // Select the correct emoji option
+                        avatarOptions.forEach(opt => {
+                            if (opt.dataset.avatar === selectedAvatar) {
+                                opt.classList.add('selected');
+                            }
+                        });
+                        console.log('Restored emoji avatar from localStorage:', selectedAvatar);
+                    }
+                } catch (e) {
+                    console.log('Could not restore saved avatar, using default');
+                    useDefaultAvatar();
+                }
+            } else {
+                useDefaultAvatar();
+            }
+        };
+        
+        testImg.src = avatarFilePath;
+    } else {
+        // No name entered yet, use localStorage or default
+        if (savedAvatar) {
+            try {
+                const avatarData = JSON.parse(savedAvatar);
+                if (avatarData.type === 'custom') {
+                    customAvatarData = avatarData.data;
+                    selectedAvatar = null;
+                    customAvatarPreview.innerHTML = `<img src="${customAvatarData}" alt="Custom Avatar">`;
+                    customAvatarPreview.style.display = 'block';
+                    console.log('Restored custom avatar from localStorage');
+                } else {
+                    selectedAvatar = avatarData.data;
+                    customAvatarData = null;
+                    avatarOptions.forEach(opt => {
+                        if (opt.dataset.avatar === selectedAvatar) {
+                            opt.classList.add('selected');
+                        }
+                    });
+                    console.log('Restored emoji avatar from localStorage:', selectedAvatar);
+                }
+            } catch (e) {
+                console.log('Could not restore saved avatar, using default');
+                useDefaultAvatar();
+            }
+        } else {
+            useDefaultAvatar();
+        }
+    }
+    
+    function useDefaultAvatar() {
+        // No saved avatar - select default target emoji
+        const defaultOption = document.querySelector('[data-avatar="🎯"]');
+        if (defaultOption) {
+            defaultOption.classList.add('selected');
+            console.log('Set default target emoji avatar');
+        }
+    }
+    
     nameInput.focus(); 
+    
+    // Handle avatar selection from grid
+    avatarOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            console.log('Avatar option clicked:', option.dataset.avatar);
+            // Remove selected class from all options
+            avatarOptions.forEach(opt => opt.classList.remove('selected'));
+            // Add selected class to clicked option
+            option.classList.add('selected');
+            // Update selected avatar
+            selectedAvatar = option.dataset.avatar;
+            customAvatarData = null; // Clear custom avatar if emoji selected
+            customAvatarPreview.style.display = 'none';
+            console.log('✅ Avatar updated to:', selectedAvatar);
+            
+            // Save to localStorage
+            localStorage.setItem('domino_player_avatar', JSON.stringify({
+                type: 'emoji',
+                data: selectedAvatar
+            }));
+            console.log('✅ Avatar saved to localStorage');
+        });
+    });
+    
+    // Handle custom avatar upload
+    avatarUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            // Check file size (limit to 500KB)
+            if (file.size > 500 * 1024) {
+                alert('Image too large! Please choose an image smaller than 500KB.');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                // Create an image element to compress the image
+                const img = new Image();
+                img.onload = () => {
+                    // Create canvas for compression
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set maximum dimensions (keep it small for Socket.IO)
+                    const maxSize = 64; // 64x64 pixels maximum
+                    let { width, height } = img;
+                    
+                    // Calculate new dimensions maintaining aspect ratio
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress the image
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to compressed data URL (JPEG with 70% quality)
+                    customAvatarData = canvas.toDataURL('image/jpeg', 0.7);
+                    selectedAvatar = null; // Clear emoji selection
+                    
+                    // Remove selected class from all emoji options
+                    avatarOptions.forEach(opt => opt.classList.remove('selected'));
+                    
+                    // Show preview
+                    customAvatarPreview.innerHTML = `<img src="${customAvatarData}" alt="Custom Avatar">`;
+                    customAvatarPreview.style.display = 'block';
+                    console.log('Custom avatar uploaded and compressed');
+                    
+                    // Save to localStorage
+                    localStorage.setItem('domino_player_avatar', JSON.stringify({
+                        type: 'custom',
+                        data: customAvatarData
+                    }));
+                    
+                    // NEW: Also save as file for permanent storage
+                    const currentPlayerName = nameInput.value.trim();
+                    if (currentPlayerName) {
+                        saveAvatarAsFile(currentPlayerName, customAvatarData);
+                    } else {
+                        // Show message to encourage entering name for permanent save
+                        const statusDiv = document.getElementById('profile-status');
+                        if (statusDiv) {
+                            statusDiv.innerHTML = '💡 Enter your name to save avatar permanently!';
+                            statusDiv.style.color = 'orange';
+                            statusDiv.style.fontWeight = 'bold';
+                        }
+                        console.log('⚠️ Enter name to save avatar as permanent file');
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
     
     // Function to handle name submission
     const submitName = () => {
         const name = nameInput.value.trim();
+        const roomId = roomInput.value.trim();
+        const targetScoreSelect = document.getElementById('target-score');
+        const targetScore = targetScoreSelect ? parseInt(targetScoreSelect.value, 10) : 70;
         if (name) {
-            lobbyContainer.style.display = 'none';
-            connectToServer(name); 
+            // Don't save name to localStorage - keep it fresh each session
+            // localStorage.setItem('domino_player_name', name);
+            // ALWAYS check for avatar file FIRST - highest priority
+            const testImg = new Image();
+            const avatarFilePath = `assets/icons/${name}_avatar.jpg`;
+            testImg.onload = function() {
+                console.log('🎯 PRIORITY 1: Found avatar file for', name, '- using file (ignoring localStorage)');
+                lobbyContainer.style.display = 'none';
+                // Send with null avatar data - server will set type='file' 
+                connectToServer(name, null, roomId, targetScore); 
+            };
+            testImg.onerror = function() {
+                console.log('ℹ️ No avatar file for', name, '- checking localStorage and selections');
+                lobbyContainer.style.display = 'none';
+                // PRIORITY 2: Use selected avatar (custom upload or emoji)
+                const avatarData = {
+                    type: customAvatarData ? 'custom' : 'emoji',
+                    data: customAvatarData || selectedAvatar
+                };
+                console.log('PRIORITY 2: Using selected avatar:', avatarData);
+                connectToServer(name, avatarData, roomId, targetScore); 
+            };
+            // Always test for the file first
+            testImg.src = avatarFilePath;
         }
     };
     
     // Handle button click
     setNameBtn.addEventListener('click', submitName);
+    
+    // Handle clear profile button
+    const clearProfileBtn = document.getElementById('clear-profile-btn');
+    if (clearProfileBtn) {
+        clearProfileBtn.addEventListener('click', () => {
+            // Clear localStorage
+            localStorage.removeItem('domino_player_name');
+            localStorage.removeItem('domino_player_avatar');
+            
+            // Reset form
+            nameInput.value = '';
+            customAvatarData = null;
+            selectedAvatar = '🎯';
+            customAvatarPreview.style.display = 'none';
+            
+            // Reset avatar selection to default
+            avatarOptions.forEach(opt => opt.classList.remove('selected'));
+            const defaultOption = document.querySelector('[data-avatar="🎯"]');
+            if (defaultOption) {
+                defaultOption.classList.add('selected');
+            }
+            
+            // Hide status message
+            const profileStatus = document.getElementById('profile-status');
+            if (profileStatus) {
+                profileStatus.style.display = 'none';
+            }
+            
+            console.log('Profile cleared - large avatar data removed');
+            nameInput.focus();
+        });
+    }
+    
+    // Add emergency function to clear large avatar data
+    window.clearLargeAvatarData = () => {
+        localStorage.removeItem('domino_player_avatar');
+        console.log('Large avatar data cleared from localStorage');
+        location.reload();
+    };
+    
+    // Function to save avatar as permanent file
+    function saveAvatarAsFile(playerName, avatarData) {
+        fetch('/save-avatar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playerName: playerName,
+                avatarData: avatarData
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Avatar saved as permanent file:', data.filename);
+                
+                // Show success message to user
+                const statusDiv = document.getElementById('profile-status');
+                if (statusDiv) {
+                    statusDiv.innerHTML = `✅ Avatar saved permanently as ${data.filename}`;
+                    statusDiv.style.color = 'green';
+                    statusDiv.style.fontWeight = 'bold';
+                }
+                
+                // Clear localStorage since we now have a file
+                localStorage.removeItem('domino_player_avatar');
+                console.log('🗑️ Cleared localStorage - using file instead');
+            } else {
+                console.error('❌ Failed to save avatar file:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error saving avatar file:', error);
+        });
+    }
     
     // Handle Enter key press
     nameInput.addEventListener('keypress', (e) => {
@@ -144,27 +553,55 @@ function setupLobby() {
             submitName();
         }
     });
+    
+    // Auto-save custom avatar as file when name is entered
+    nameInput.addEventListener('input', () => {
+        const currentName = nameInput.value.trim();
+        if (currentName.length >= 2 && customAvatarData) {
+            saveAvatarAsFile(currentName, customAvatarData);
+        }
+    });
 }
 
 /**
  * Establishes the connection to the server via Socket.IO and sets up listeners.
  */
-function connectToServer(playerName) {
+function connectToServer(playerName, avatarData, roomId) {
+    let targetScore = 70;
+    // Try to get targetScore from arguments (if passed)
+    if (arguments.length > 3 && arguments[3]) {
+        targetScore = arguments[3];
+    } else {
+        const targetScoreSelect = document.getElementById('target-score');
+        if (targetScoreSelect) {
+            targetScore = parseInt(targetScoreSelect.value, 10) || 70;
+        }
+    }
     socket = io();
 
     socket.on('connect', () => {
         console.log("Connected to server.");
-        socket.emit('setPlayerName', playerName);
+        socket.emit('setPlayerName', { name: playerName, avatar: avatarData, roomId: roomId, targetScore: targetScore });
     });
 
     socket.on('playerAssigned', (name) => { myJugadorName = name; });
 
     socket.on('gameState', (state) => {
         gameState = state;
-        
+        // Update points objective display in game UI
+        if (state.targetScore) {
+            if (typeof updatePointsObjective === 'function') {
+                updatePointsObjective(state.targetScore);
+            } else {
+                const pointsObjDiv = document.getElementById('points-objective');
+                if (pointsObjDiv) {
+                    pointsObjDiv.textContent = 'Puntaje objetivo: ' + state.targetScore;
+                    pointsObjDiv.style.display = 'inline-block';
+                }
+            }
+        }
         const newRoundContainer = document.getElementById('new-round-container');
         if (!newRoundContainer) return;
-
         // TRIPLE CHECK: Only show round dialogs if we have a player assigned AND are connected
         if (!myJugadorName || !socket || !socket.connected) {
             // Force hide with multiple methods
@@ -174,35 +611,19 @@ function connectToServer(playerName) {
             newRoundContainer.style.zIndex = '-9999';
             return;
         }
-
-        // Determine if the "End of Round/Match" dialog should be visible
-        // Show dialog for: round messages, match over, blocked games, or any game end state
-        // Remove gameInitialized requirement for blocked games since they can be blocked while still "initialized"
-        
-        // ENHANCED BLOCKED GAME DETECTION: Check if game appears to be blocked even without server notification
+        // ...existing code for dialog logic...
         let isClientDetectedBlock = false;
         if (gameState.jugadoresInfo && gameState.jugadoresInfo.length > 0 && !gameState.gameInitialized) {
             const playersWithTiles = gameState.jugadoresInfo.filter(player => player.tileCount > 0);
             const playersWithNoTiles = gameState.jugadoresInfo.filter(player => player.tileCount === 0);
-            
-            // Only consider it blocked if:
-            // 1. Multiple players have tiles AND
-            // 2. No player has 0 tiles (meaning no one won by going out) AND
-            // 3. No "domino!" message (indicating a normal win) AND
-            // 4. Check for "Juego Cerrado!" which indicates a blocked game
             const hasWinMessage = gameState.endRoundMessage && gameState.endRoundMessage.toLowerCase().includes('domino');
             const hasBlockedMessage = gameState.endRoundMessage && gameState.endRoundMessage.toLowerCase().includes('juego cerrado');
-            
-            // If we have "Juego Cerrado!" message, it's definitely a blocked game
             if (hasBlockedMessage) {
                 isClientDetectedBlock = true;
-            }
-            // Otherwise use tile count analysis
-            else if (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage) {
+            } else if (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage) {
                 isClientDetectedBlock = true;
             }
         }
-        
         const shouldShowDialog = (
             (!gameState.gameInitialized && (
                 !!gameState.endRoundMessage || 
@@ -210,54 +631,40 @@ function connectToServer(playerName) {
                 !!gameState.matchOver || 
                 !!gameState.roundOver ||
                 !!gameState.gameOver ||
-                isClientDetectedBlock  // Include client-detected blocked games
+                isClientDetectedBlock
             )) ||
-            // Always show for blocked games regardless of initialization state
             !!gameState.gameBlocked
         );
-
         if (shouldShowDialog) {
             const roundOverMessageDiv = document.getElementById('round-over-message');
             const newRoundBtn = document.getElementById('newRoundBtn');
-            
             if (!roundOverMessageDiv || !newRoundBtn) return;
-            
-            // Combine both round and match messages when both are present
             let message = "Mano Finalizada";
-            
-            // Handle blocked games specifically
             if (gameState.gameBlocked) {
                 message = "Juego cerrado ! Nadie puede jugar!";
                 if (gameState.endRoundMessage) {
                     message = gameState.endRoundMessage + "\n(Juego cerrado)";
                 }
-            }
-            // DETECT CLIENT-SIDE BLOCKS: If we have an endRoundMessage but players still have tiles
-            else if (gameState.endRoundMessage && gameState.jugadoresInfo) {
-                // Check if any player still has tiles (indicating a blocked game)
+                if (gameState.isTiedBlockedGame) {
+                    message += "\n¡Empate! El próximo juego lo inicia quien tenga el doble 6";
+                }
+            } else if (gameState.endRoundMessage && gameState.jugadoresInfo) {
                 const playersWithTiles = gameState.jugadoresInfo.filter(player => player.tileCount > 0);
                 const playersWithNoTiles = gameState.jugadoresInfo.filter(player => player.tileCount === 0);
                 const hasWinMessage = gameState.endRoundMessage.toLowerCase().includes('domino');
                 const hasBlockedMessage = gameState.endRoundMessage.toLowerCase().includes('juego cerrado');
-                
-                // Treat as blocked if:
-                // 1. Multiple players have tiles AND no one went out (0 tiles) AND (no domino win OR explicit blocked message)
-                // 2. OR explicit "Juego Cerrado!" message regardless of other conditions
                 if (hasBlockedMessage || (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage)) {
-                    // This was a blocked game - server sent "Juego Cerrado!" or we can detect it
                     message = gameState.endRoundMessage;
+                    if (gameState.isTiedBlockedGame) {
+                        message += "\n¡Empate! El próximo juego lo inicia quien tenga el doble 6";
+                    }
                 } else {
-                    // Normal game end - someone won or domino occurred
                     message = gameState.endRoundMessage;
                 }
-            }
-            // Handle client-detected blocked games (no server message but game appears blocked)
-            else if (isClientDetectedBlock) {
+            } else if (isClientDetectedBlock) {
                 const playersWithTiles = gameState.jugadoresInfo.filter(player => player.tileCount > 0);
                 message = `Juego Cerrado!\nNo quedan jugadas validas\nPlayers with tiles: ${playersWithTiles.map(p => `${p.displayName}(${p.tileCount})`).join(', ')}`;
-            }
-            // Handle other end game scenarios
-            else if (gameState.endRoundMessage && gameState.endMatchMessage) {
+            } else if (gameState.endRoundMessage && gameState.endMatchMessage) {
                 message = gameState.endRoundMessage + "\n" + gameState.endMatchMessage;
             } else if (gameState.endMatchMessage) {
                 message = gameState.endMatchMessage;
@@ -268,10 +675,7 @@ function connectToServer(playerName) {
             } else if (gameState.roundOver) {
                 message = "Round Over";
             }
-            
             roundOverMessageDiv.innerText = message;
-            
-            // ENSURE MESSAGE ELEMENT IS VISIBLE TOO
             roundOverMessageDiv.style.setProperty('display', 'block', 'important');
             roundOverMessageDiv.style.setProperty('visibility', 'visible', 'important');
             roundOverMessageDiv.style.setProperty('opacity', '1', 'important');
@@ -279,59 +683,37 @@ function connectToServer(playerName) {
             roundOverMessageDiv.style.setProperty('font-size', '16px', 'important');
             roundOverMessageDiv.style.setProperty('text-align', 'center', 'important');
             roundOverMessageDiv.style.setProperty('padding', '20px', 'important');
-            
-            // Override CSS hiding to show the dialog
-            
-            // SUPER AGGRESSIVE: Override all possible CSS hiding
             newRoundContainer.style.setProperty('display', 'block', 'important');
             newRoundContainer.style.setProperty('visibility', 'visible', 'important');
             newRoundContainer.style.setProperty('opacity', '1', 'important');
             newRoundContainer.style.setProperty('z-index', '9999', 'important');
             newRoundContainer.style.setProperty('position', 'fixed', 'important');
             newRoundContainer.style.setProperty('pointer-events', 'auto', 'important');
-            
-            // Also ensure parent elements are not hiding it
             const body = document.body;
             const html = document.documentElement;
-            body.style.setProperty('overflow', 'hidden', 'important');  // Changed from 'visible' to 'hidden'
-            html.style.setProperty('overflow', 'hidden', 'important');  // Changed from 'visible' to 'hidden'
-            
+            body.style.setProperty('overflow', 'hidden', 'important');
+            html.style.setProperty('overflow', 'hidden', 'important');
             const amIReady = gameState.readyPlayers && gameState.readyPlayers.includes(myJugadorName);
             newRoundBtn.disabled = amIReady;
             newRoundBtn.innerText = amIReady ? 'Esperando por los demas...' : (gameState.matchOver ? 'Jugar Match Nuevo' : 'Empezar Mano Nueva');
-            
-            // ENSURE BUTTON IS VISIBLE TOO
             newRoundBtn.style.setProperty('display', 'block', 'important');
             newRoundBtn.style.setProperty('visibility', 'visible', 'important');
             newRoundBtn.style.setProperty('opacity', '1', 'important');
             newRoundBtn.style.setProperty('pointer-events', 'auto', 'important');
-            
-            // Mark that dialog was shown to prevent immediate hiding
-            // Only update timestamp if dialog wasn't already being shown
             if (dialogShownTimestamp === 0) {
                 dialogShownTimestamp = Date.now();
             }
         } else {
-            // Re-hide the dialog (CSS will handle most of this)
-            // BUT prevent hiding if dialog was just shown (within 3 seconds)
             const timeSinceShown = Date.now() - dialogShownTimestamp;
-            
-            // EXCEPTION: Always allow hiding if game has restarted (new round started)
             const gameHasRestarted = gameState.gameInitialized && gameState.board && gameState.board.length > 0;
-            
-            // EXCEPTION: Always allow hiding if all players are ready
             const allPlayersReady = gameState.readyPlayers && gameState.jugadoresInfo && 
                 gameState.readyPlayers.length === gameState.jugadoresInfo.length;
-            
             if (timeSinceShown < 3000 && dialogShownTimestamp > 0 && !gameHasRestarted && !allPlayersReady) {
-                return; // Don't hide the dialog if it was just shown
+                return;
             }
-            
             newRoundContainer.style.display = 'none';
             newRoundContainer.style.visibility = 'hidden';
             newRoundContainer.style.opacity = '0';
-            
-            // Reset the timestamp when we actually hide the dialog
             dialogShownTimestamp = 0;
         }
     });
@@ -350,21 +732,18 @@ function connectToServer(playerName) {
         }
     });
 
-    // NEW: Listen for tile placement sounds from ANY player
     socket.on('tilePlaced', (data) => {
         if (tileSound && tileSound.isLoaded()) {
             tileSound.play();
         }
     });
 
-    // NEW: Listen for pass turn sounds from ANY player  
     socket.on('playerPassed', (data) => {
         if (passSound && passSound.isLoaded()) {
             passSound.play();
         }
     });
 
-    // NEW: Listen for domino win bell sounds from ANY player
     socket.on('playerWonHand', (data) => {
         if (winSound && winSound.isLoaded()) {
             winSound.play();
@@ -372,15 +751,10 @@ function connectToServer(playerName) {
     });
 
     socket.on('gameRestarted', (data) => {
-        // Clear local state
         myPlayerHand = [];
         selectedTileIndex = null;
         messageDisplay = { text: '', time: 0 };
-        
-        // Show restart message
         showMessage(`🔄 ${data.message}`);
-        
-        // Add restart notification to chat
         const messagesDiv = document.getElementById('chat-messages');
         const messageElement = document.createElement('p');
         messageElement.innerHTML = `<b>SISTEMA:</b> 🔄 Juego reiniciado por ${data.restartedBy}`;
@@ -400,7 +774,6 @@ function connectToServer(playerName) {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
 
-    // NEW: Listen for voice messages
     socket.on('voiceMessage', (data) => {
         playVoiceMessage(data);
     });
@@ -504,6 +877,11 @@ function updateUI() {
     if (isMyTurn) {
         document.getElementById('playLeftBtn').disabled = selectedTileIndex === null;
         document.getElementById('playRightBtn').disabled = selectedTileIndex === null;
+        
+        // Show special message for first move after tied blocked game
+        if (gameState.isFirstMove && gameState.isAfterTiedBlockedGame) {
+            showMessage('Tu turno! Puedes jugar cualquier ficha (tienes el doble 6)');
+        }
     }
 }
 
@@ -641,6 +1019,8 @@ function determinePlayerPositions() {
 function updatePlayersUI() {
     if (!gameState || !gameState.jugadoresInfo || !myJugadorName) { return; }
 
+    console.log('🎮 Updating players UI with game state:', gameState.jugadoresInfo);
+
     const playerPositions = determinePlayerPositions();
 
     // Hide all displays initially
@@ -658,12 +1038,72 @@ function updatePlayersUI() {
         const playerData = gameState.jugadoresInfo.find(p => p.name === playerName);
         if (!playerData) return;
 
+        console.log('🎯 Player data for', playerName, ':', playerData);
+
         div.style.display = 'flex';
         div.innerHTML = ''; 
 
-        const imgElement = document.createElement('img');
-        imgElement.alt = `${playerData.displayName} avatar`;
-        getPlayerIcon(imgElement, playerData.displayName, playerData.name);
+        // Create avatar element
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'player-avatar';
+        
+        // PRIORITY SYSTEM for avatar display:
+        // 1st: Avatar files (type='file' or when no avatar data but file exists)
+        // 2nd: Custom uploads (type='custom') 
+        // 3rd: Selected emojis (type='emoji')
+        // 4th: Default avatar
+        
+        if (playerData.avatar && playerData.avatar.type === 'file') {
+            // Server indicated to use file - try to load image file
+            const img = document.createElement('img');
+            img.style.display = 'none';
+            avatarDiv.appendChild(img);
+            
+            getPlayerIcon(img, playerData.displayName, playerData.name);
+            
+            setTimeout(() => {
+                if (img.style.display === 'none') {
+                    // File failed to load, use default
+                    avatarDiv.textContent = '👤';
+                    console.log('⚠️ Avatar file failed to load for', playerData.displayName);
+                } else {
+                    console.log('✅ Using avatar FILE for', playerData.displayName);
+                }
+            }, 500);
+        } else if (playerData.avatar && playerData.avatar.type === 'custom') {
+            // Custom uploaded avatar
+            avatarDiv.classList.add('custom-avatar');
+            const customImg = document.createElement('img');
+            customImg.src = playerData.avatar.data;
+            customImg.alt = `${playerData.displayName} avatar`;
+            customImg.style.width = '40px';
+            customImg.style.height = '40px';
+            customImg.style.borderRadius = '50%';
+            avatarDiv.appendChild(customImg);
+            console.log('✅ Using CUSTOM upload for', playerData.displayName);
+        } else if (playerData.avatar && playerData.avatar.type === 'emoji') {
+            // Emoji avatar
+            avatarDiv.textContent = playerData.avatar.data;
+            avatarDiv.style.fontSize = '24px';
+            console.log('✅ Using EMOJI avatar for', playerData.displayName, ':', playerData.avatar.data);
+        } else {
+            // No avatar data - try file first, then default
+            const img = document.createElement('img');
+            img.style.display = 'none';
+            avatarDiv.appendChild(img);
+            
+            getPlayerIcon(img, playerData.displayName, playerData.name);
+            
+            setTimeout(() => {
+                if (img.style.display === 'none') {
+                    // No file found, use default
+                    avatarDiv.textContent = '👤';
+                    console.log('⚠️ Using DEFAULT avatar for', playerData.displayName);
+                } else {
+                    console.log('✅ Using avatar FILE (fallback) for', playerData.displayName);
+                }
+            }, 500);
+        }
 
         const infoDiv = document.createElement('div');
         infoDiv.className = 'player-info-text';
@@ -699,7 +1139,7 @@ function updatePlayersUI() {
         infoDiv.appendChild(nameDiv);
         infoDiv.appendChild(tileCountDiv);
 
-        div.appendChild(imgElement);
+        div.appendChild(avatarDiv);
         div.appendChild(infoDiv);
 
         div.classList.toggle('current-turn', playerData.name === gameState.currentTurn);
@@ -721,6 +1161,27 @@ function updateTeamInfo() {
     if (teams.teamA && teams.teamA.length > 0) { teamsHtml += `<b>Equipo A:</b> ${teams.teamA.map(getDisplayName).join(' & ')}<br>`; }
     if (teams.teamB && teams.teamB.length > 0) { teamsHtml += `<b>Equipo B:</b> ${teams.teamB.map(getDisplayName).join(' & ')}<br>`; }
     teamInfoDiv.innerHTML = teamsHtml;
+}
+
+function updateRoomInfo() {
+    const roomNameSpan = document.getElementById('room-name');
+    const pointsObjSpan = document.getElementById('points-objective');
+    if (!roomNameSpan || !pointsObjSpan) return;
+    console.log('[DEBUG] updateRoomInfo: gameState.targetScore =', gameState.targetScore);
+    if (gameState.roomId) {
+        roomNameSpan.textContent = gameState.roomId;
+        if (gameState.targetScore) {
+            pointsObjSpan.textContent = 'A ' + gameState.targetScore;
+            pointsObjSpan.style.display = 'inline-block';
+        } else {
+            pointsObjSpan.textContent = '';
+            pointsObjSpan.style.display = 'none';
+        }
+    } else {
+        roomNameSpan.textContent = '';
+        pointsObjSpan.textContent = '';
+        pointsObjSpan.style.display = 'none';
+    }
 }
 
 function updateScoreboard() {
@@ -1197,9 +1658,15 @@ function clientHasValidMove() {
     if (!myPlayerHand || myPlayerHand.length === 0) return false;
     if (gameState.isFirstMove) {
         if (gameState.isFirstRoundOfMatch) {
+            // First round of match: must play double 6
             return myPlayerHand.some(t => t.left === 6 && t.right === 6);
+        } else if (gameState.isAfterTiedBlockedGame) {
+            // After a tied blocked game: player with double 6 can play any tile
+            return myPlayerHand.length > 0;
+        } else {
+            // Regular first move of a new round
+            return true;
         }
-        return true;
     }
     return myPlayerHand.some(t => t.left === gameState.leftEnd || t.right === gameState.leftEnd || t.left === gameState.rightEnd || t.right === gameState.rightEnd);
 }

@@ -1,3 +1,9 @@
+.puntaje-label {
+  margin-left: 16px;
+}
+.puntaje-select {
+  margin-left: 3px;
+}
 /* ================================================================== */
 /* --- UI POSITIONING & SIZING VARIABLES --- */
 /* You can easily modify these values to move UI elements around. */
@@ -138,7 +144,7 @@ html, body {
 
 #player-display-left {
     left: var(--ui-edge-padding);
-    top: 230px;
+    top: 240px;
 }
 
 #player-display-top {
@@ -165,6 +171,19 @@ html, body {
     font-size: 14px;
     pointer-events: auto;
     z-index: 20;
+}
+
+#room-info {
+    position: absolute;
+    top: 70px;
+    left: var(--ui-edge-padding);
+    background: rgba(0, 0, 0, 0.5);
+    color: #ccc;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 19;
 }
 
 #scoreboard {
@@ -311,9 +330,9 @@ html, body {
     pointer-events: auto;
 }
 
-#lobby-container h2 {
-    font-size: 28px;
-    margin-bottom: 20px;
+#lobby-container h2 {                /* crear su perfil*/
+    font-size: 26px;
+    margin-bottom: 15px;
     text-shadow: 2px 2px 4px black;
 }
 
@@ -336,12 +355,39 @@ html, body {
     background-color: #007BFF;
     color: white;
     font-weight: bold;
+    margin: 5px;
 }
 
 #lobby-container button:disabled {
     background-color: #555;
     cursor: not-allowed;
 }
+
+#profile-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+#clear-profile-btn {
+    background-color: #dc3545 !important;
+    font-size: 14px !important;
+    padding: 8px 15px !important;
+}
+
+#clear-profile-btn:hover {
+    background-color: #c82333 !important;
+}
+
+#profile-status {
+    display: none;
+    color: #4CAF50;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
 #matches-won-container {
     position: absolute;
     top: 100px; /* Adjust as needed */
@@ -505,4 +551,151 @@ html, body {
 
 #voice-chat-btn:active {
     background-color: #ff4444 !important;
+}
+
+/* ================================================================== */
+/* --- AVATAR SYSTEM --- */
+/* ================================================================== */
+
+#avatar-selection {
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    max-width: 500px;
+    border: 2px solid #444;
+}
+
+#avatar-selection h3 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    text-align: center;
+    color: #fff;
+}
+
+#avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-items: center;
+}
+
+.avatar-option {
+    width: 45px;
+    height: 45px;
+    border: 3px solid #555;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.1);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.avatar-option:hover {
+    border-color: #fff;
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.avatar-option.selected {
+    border-color: #007BFF;
+    background: rgba(0, 123, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 123, 255, 0.5);
+    transform: scale(1.1);
+}
+
+#custom-avatar-section {
+    border-top: 1px solid #444;
+    padding-top: 15px;
+    text-align: center;
+}
+
+#custom-avatar-section h4 {
+    font-size: 16px;
+    margin-bottom: 5px;
+    color: #ccc;
+}
+
+#avatar-upload {
+    display: none;
+}
+
+.custom-file-upload {
+    display: inline-block;
+    background: #333;
+    color: white;
+    border: 2px solid #555;
+    border-radius: 5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+    text-align: center;
+    min-width: 150px;
+}
+
+.custom-file-upload:hover {
+    border-color: #007BFF;
+    background: #444;
+}
+
+#custom-avatar-preview {
+    margin-top: 10px;
+    display: none;
+}
+
+#custom-avatar-preview img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid #007BFF;
+    object-fit: cover;
+}
+
+/* Player avatar styling in game */
+.player-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 2px solid #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+/* Specific styling for different player positions */
+#player-display-bottom .player-avatar,
+#player-display-top .player-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    margin-right: 6px;
+}
+
+#player-display-left .player-avatar,
+#player-display-right .player-avatar {
+    margin-right: 0;
+    margin-bottom: 5px;
+}
+
+.player-avatar.custom-avatar {
+    background: none;
+    border-color: #007BFF;
+}
+
+.player-avatar.custom-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
 }
