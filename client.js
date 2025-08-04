@@ -1490,8 +1490,13 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
     const prevDomino = board[i - 1];
     const prevWasDouble = prevDomino && prevDomino.left === prevDomino.right;
 
-    // 102. Check if it's time to make a turn on right side
-    if (turnCountR < 2 && straightCountR >= turnAfterR) {
+    // Special handling for doubles on right side - check if we're at a turn position
+    const tileNumberFromSpinner = i - spinnerIndex;
+    const isAtTurnPosition = (turnCountR < 2 && straightCountR >= turnAfterR);
+    const isSpecialDouble = (isAtTurnPosition && isDouble);
+
+    // 102. Check if it's time to make a turn on right side (but not for special double)
+    if (turnCountR < 2 && straightCountR >= turnAfterR && !isSpecialDouble) {
         // 103. Store old direction before changing
         const oldDir = { ...dirR };
         // 104. Calculate new direction (90-degree counter-clockwise turn for symmetry)
@@ -1534,23 +1539,61 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
         turnAfterR = 3;
         straightCountR = 0;
 
-    // 113. Straight line positioning (no turn)
+    // 113. Straight line positioning (no turn) OR special double handling
     } else {
-        // 114. Set domino dimensions based on direction and double status
-        if (dirR.x !== 0) { // Horizontal line
-            w = isDouble ? short : long;
-            h = isDouble ? long : short;
-        } else { // Vertical line (down branch)
-            w = isDouble ? long : short;
-            h = isDouble ? short : long;
-        }
+        // Handle special double at turn positions
+        if (isSpecialDouble) {
+            // Place double PERPENDICULAR to current direction of travel
+            if (dirR.x !== 0) { // Currently moving horizontally
+                // Place double vertically (perpendicular to horizontal movement)
+                w = short;
+                h = long;
+            } else { // Currently moving vertically
+                // Place double horizontally (perpendicular to vertical movement)
+                w = long;
+                h = short;
+            }
+            
+            // Position based on current direction (before the turn)
+            if (dirR.x === 1) { // Moving right - place double vertically to the right
+                x = connR.x + gap;
+                y = connR.y - h / 2;
+            } else if (dirR.y === 1) { // Moving down - place double horizontally below
+                x = connR.x - w / 2;
+                y = connR.y + gap;
+            } else if (dirR.x === -1) { // Moving left - place double vertically to the left
+                x = connR.x - w - gap;
+                y = connR.y - h / 2;
+            } else if (dirR.y === -1) { // Moving up - place double horizontally above
+                x = connR.x - w / 2;
+                y = connR.y - h - gap;
+            }
+            
+            // NOW simulate the turn AFTER positioning the double
+            const oldDir = { ...dirR };
+            dirR = { x: -oldDir.y, y: oldDir.x };
+            
+            // Increment turn counter and update settings
+            turnCountR++;
+            turnAfterR = 3;
+            straightCountR = 0;
+        } else {
+            // 114. Set domino dimensions based on direction and double status
+            if (dirR.x !== 0) { // Horizontal line
+                w = isDouble ? short : long;
+                h = isDouble ? long : short;
+            } else { // Vertical line (down branch)
+                w = isDouble ? long : short;
+                h = isDouble ? short : long;
+            }
 
-        // 115. Position domino based on current direction
-        if (dirR.x === 1) { x = connR.x + gap; y = connR.y - h / 2; }
-        // 116. Position for down direction
-        else if (dirR.y === 1) { y = connR.y + gap; x = connR.x - w / 2; }
-        // 117. Position for left direction
-        else { x = connR.x - w - gap; y = connR.y - h / 2; }
+            // 115. Position domino based on current direction
+            if (dirR.x === 1) { x = connR.x + gap; y = connR.y - h / 2; }
+            // 116. Position for down direction
+            else if (dirR.y === 1) { y = connR.y + gap; x = connR.x - w / 2; }
+            // 117. Position for left direction
+            else { x = connR.x - w - gap; y = connR.y - h / 2; }
+        }
     }
 
     // 118. Determine if domino should be visually reversed
@@ -1559,7 +1602,19 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
     drawableTiles[i] = { domino, x, y, w, h, isReversed };
 
     // 120. Update connection point based on domino direction
-    if (dirR.x === 1) { connR = { x: x + w, y: y + h / 2 }; } 
+    if (isSpecialDouble) {
+        // For special double, connect at bottom edge middle since it's always vertical
+        // But set the connection point based on the NEW direction after the simulated turn
+        if (dirR.x === 1) { // New direction is right
+            connR = { x: x + w, y: y + h / 2 };
+        } else if (dirR.y === 1) { // New direction is down
+            connR = { x: x + w / 2, y: y + h };
+        } else if (dirR.x === -1) { // New direction is left
+            connR = { x: x, y: y + h / 2 };
+        } else if (dirR.y === -1) { // New direction is up
+            connR = { x: x + w / 2, y: y };
+        }
+    } else if (dirR.x === 1) { connR = { x: x + w, y: y + h / 2 }; } 
     else if (dirR.x === -1) { connR = { x: x, y: y + h / 2 }; } 
     else if (dirR.y === 1) { connR = { x: x + w / 2, y: y + h }; } // Downward turn
     else { connR = { x: x + w / 2, y: y }; }
@@ -1597,8 +1652,14 @@ for (let i = spinnerIndex + 1; i < board.length; i++) {
         // 101. Get previous domino to check if it was a double (next in array for left side)
         const prevDomino = board[i + 1];
         const prevWasDouble = prevDomino && prevDomino.left === prevDomino.right;
-// 102. Check if it's time to make a turn on left side
-if (turnCountL < 2 && straightCountL >= turnAfterL) {
+
+        // Special handling for doubles on left side - check if we're at a turn position
+        const tileNumberFromSpinner = spinnerIndex - i;
+        const isAtTurnPosition = (turnCountL < 2 && straightCountL >= turnAfterL);
+        const isSpecialDouble = (isAtTurnPosition && isDouble);
+
+// 102. Check if it's time to make a turn on left side (but not for special double)
+if (turnCountL < 2 && straightCountL >= turnAfterL && !isSpecialDouble) {
     // 103. Store old direction before changing
     const oldDir = { ...dirL };
     // 104. Calculate new direction (90-degree counter-clockwise turn)
@@ -1639,7 +1700,45 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
     turnCountL++;
     turnAfterL = 3;
     straightCountL = 0;
-        // 113. Straight line positioning (no turn)
+
+    // 113. Straight line positioning (no turn) OR special double handling
+    } else {
+        // Handle special double at turn positions
+        if (isSpecialDouble) {
+            // Place double PERPENDICULAR to current direction of travel
+            if (dirL.x !== 0) { // Currently moving horizontally
+                // Place double vertically (perpendicular to horizontal movement)
+                w = short;
+                h = long;
+            } else { // Currently moving vertically
+                // Place double horizontally (perpendicular to vertical movement)
+                w = long;
+                h = short;
+            }
+            
+            // Position based on current direction (before the turn)
+            if (dirL.x === -1) { // Moving left - place double vertically to the left
+                x = connL.x - w - gap;
+                y = connL.y - h / 2;
+            } else if (dirL.y === 1) { // Moving down - place double horizontally below
+                x = connL.x - w / 2;
+                y = connL.y + gap;
+            } else if (dirL.x === 1) { // Moving right - place double vertically to the right
+                x = connL.x + gap;
+                y = connL.y - h / 2;
+            } else if (dirL.y === -1) { // Moving up - place double horizontally above
+                x = connL.x - w / 2;
+                y = connL.y - h - gap;
+            }
+            
+            // NOW simulate the turn AFTER positioning the double
+            const oldDir = { ...dirL };
+            dirL = { x: oldDir.y, y: -oldDir.x };
+            
+            // Increment turn counter and update settings
+            turnCountL++;
+            turnAfterL = 3;
+            straightCountL = 0;
         } else {
             // 114. Set domino dimensions based on direction and double status
             if (dirL.x !== 0) { // Horizontal line
@@ -1657,14 +1756,26 @@ if (turnCountL < 2 && straightCountL >= turnAfterL) {
             // 117. Position for right direction
             else { x = connL.x + gap; y = connL.y - h / 2; }
         }
+    }
 
-        // 118. Determine if domino should be visually reversed (opposite of right side)
-        const isReversed = !(dirL.x === -1 || dirL.y === -1);
-        // 119. Store domino drawable data
-        drawableTiles[i] = { domino, x, y, w, h, isReversed };
+    // 118. Determine if domino should be visually reversed (opposite of right side)
+    const isReversed = !(dirL.x === -1 || dirL.y === -1);
+    // 119. Store domino drawable data
+    drawableTiles[i] = { domino, x, y, w, h, isReversed };
 
         // 120. Update connection point based on domino direction
-        if (dirL.x === 1) { connL = { x: x + w, y: y + h / 2 }; } // Rightward direction - connect at right edge
+        if (isSpecialDouble) {
+            // For special double, set the connection point based on the NEW direction after the simulated turn
+            if (dirL.x === -1) { // New direction is left
+                connL = { x: x, y: y + h / 2 };
+            } else if (dirL.y === 1) { // New direction is down
+                connL = { x: x + w / 2, y: y + h };
+            } else if (dirL.x === 1) { // New direction is right
+                connL = { x: x + w, y: y + h / 2 };
+            } else if (dirL.y === -1) { // New direction is up
+                connL = { x: x + w / 2, y: y };
+            }
+        } else if (dirL.x === 1) { connL = { x: x + w, y: y + h / 2 }; } // Rightward direction - connect at right edge
         else if (dirL.x === -1) { connL = { x: x, y: y + h / 2 }; }
         else if (dirL.y === 1) { connL = { x: x + w / 2, y: y + h }; }
         else if (dirL.y === -1) { connL = { x: x + w / 2, y: y }; } // Upward direction - connect at top

@@ -337,7 +337,7 @@ html, body {
 
 /* Specific compact styling for TOP and BOTTOM players only */
 #player-display-top {
-    width: 200px; /* Increased from 260px to accommodate tiny tiles */
+    width: 220px; /* Increased from 260px to accommodate tiny tiles */
     flex-direction: row;
     padding: 2px 4px; /* Reduced padding only for top/bottom */
 }
@@ -423,7 +423,7 @@ html, body {
 
 #player-display-top {
     top: var(--ui-edge-padding);
-    left: 35%;
+    left: 60%;
     transform: translateX(-50%);
 }
 
@@ -566,7 +566,8 @@ html, body {
     color: white;
     font-size: 22px;
     font-weight: bold;
-    margin-bottom: 20px;
+    margin-bottom: 20%;
+    margin-top: -2em;
 }
 #new-round-container button {
     padding: 15px 30px;
