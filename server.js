@@ -1,6 +1,4 @@
-// ...existing code...
 
-// (Move this endpoint after app is initialized)
 // =============================================================================
 // == server.js                                                               ==
 // =============================================================================
@@ -9,6 +7,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const analytics = require('./analytics');
 
 const app = express();
 // Endpoint to get active rooms and their player counts
@@ -22,6 +21,28 @@ app.get('/active-rooms', (req, res) => {
         });
     }
     res.json({ rooms });
+});
+
+// Analytics endpoints
+app.get('/analytics-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
+});
+
+app.get('/analytics', async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 7;
+        const analyticsData = await analytics.getAnalyticsData(days);
+        const quickStats = await analytics.getQuickStats();
+        
+        res.json({
+            success: true,
+            data: analyticsData,
+            quickStats: quickStats
+        });
+    } catch (error) {
+        console.error('Analytics endpoint error:', error);
+        res.status(500).json({ success: false, error: 'Analytics unavailable' });
+    }
 });
 const server = http.createServer(app);
 const io = socketIo(server);
@@ -96,6 +117,12 @@ function findOrCreateRoom(playerName = null) {
     const newRoom = createGameRoom(newRoomId);
     gameRooms.set(newRoomId, newRoom);
     console.log(`[ROOM SYSTEM] Created new room: ${newRoomId}`);
+    
+    // Track room creation for analytics
+    analytics.trackRoomCreated(newRoomId, 70).catch(err => 
+        console.error('Analytics room creation error:', err)
+    );
+    
     return newRoom;
 }
 
@@ -431,6 +458,17 @@ function endRound(room, outcome) {
         room.gameState.endRoundMessage = endMessage + matchOverMessage;
         room.gameState.gameInitialized = false; 
         room.gameState.readyPlayers.clear();
+        
+        // Track match completion for analytics
+        const matchStats = {
+            duration: Date.now() - (room.gameCreatedAt || Date.now()),
+            totalMoves: 0, // Could track this separately if needed
+            playerCount: room.jugadores.filter(p => p.isConnected).length
+        };
+        analytics.trackGameEnd(room.roomId, winningTeamName, matchStats).catch(err =>
+            console.error('Analytics game end error:', err)
+        );
+        
         broadcastGameState(room);
         return; // Stop further execution until players are ready.
     }
@@ -464,7 +502,7 @@ function checkRoundEnd(room) {
 
 io.on('connection', (socket) => {
 
-    socket.on('setPlayerName', (data) => {
+    socket.on('setPlayerName', async (data) => {
         console.log('🎯 Received setPlayerName data:', data);
 
         // Handle both old string format and new object format
@@ -566,6 +604,14 @@ io.on('connection', (socket) => {
             socket.emit('playerAssigned', availableSlot.name);
             console.log(`[NEW PLAYER] ${displayName} connected as ${availableSlot.name} in ${room.roomId} with avatar ${avatarData.type === 'emoji' ? avatarData.data : 'custom'}.`);
 
+            // Track player join for analytics
+            await analytics.trackPlayerJoin(
+                availableSlot.name,
+                room.roomId,
+                displayName,
+                socket.request.headers['user-agent'] || 'Unknown'
+            );
+
             const connectedCount = room.jugadores.filter(p => p.isConnected).length;
             if (connectedCount === 4 && !room.gameState.gameInitialized && !room.gameState.endRoundMessage && !room.gameState.matchOver) {
                 initializeRound(room);
@@ -578,7 +624,7 @@ io.on('connection', (socket) => {
         }
     });
     
-    socket.on('placeTile', ({ tile, position }) => {
+    socket.on('placeTile', async ({ tile, position }) => {
         const room = findPlayerRoom(socket.id);
         if (!room) return;
         
@@ -641,6 +687,14 @@ io.on('connection', (socket) => {
                 }
             });
             
+            // Track tile placement for analytics
+            await analytics.trackTilePlaced(
+                room.roomId,
+                player,
+                playedTileForHighlight,
+                position
+            );
+            
             nextTurn(room);
             checkRoundEnd(room);
         } else {
@@ -697,9 +751,12 @@ io.on('connection', (socket) => {
     });
 
 // Add this to your server.js socket event handlers
-socket.on('voiceMessage', (data) => {
+socket.on('voiceMessage', async (data) => {
     const room = findPlayerRoom(socket.id);
     if (!room) return;
+    
+    // Track voice message for analytics
+    await analytics.trackVoiceMessage(room.roomId, data.sender);
     
     // Broadcast voice message to all other players in room
     room.jugadores.forEach(p => {
@@ -839,6 +896,30 @@ app.post('/save-avatar', express.json({ limit: '1mb' }), (req, res) => {
         res.json({ success: true, filename: filename });
     });
 });
+
+// =============================================================================
+// == ANALYTICS LOGGING                                                       ==
+// =============================================================================
+
+// Log daily stats every 24 hours
+setInterval(async () => {
+    try {
+        const dailyStats = analytics.getDailySummary();
+        console.log('📊 Daily Stats:', dailyStats);
+    } catch (error) {
+        console.error('Analytics daily stats error:', error);
+    }
+}, 24 * 60 * 60 * 1000); // Every 24 hours
+
+// Log quick stats every hour
+setInterval(async () => {
+    try {
+        const quickStats = await analytics.getQuickStats();
+        console.log('📊 Hourly Update:', quickStats.today);
+    } catch (error) {
+        console.error('Analytics hourly stats error:', error);
+    }
+}, 60 * 60 * 1000); // Every hour
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`[SERVER] Server listening on port ${PORT}`));

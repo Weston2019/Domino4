@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domino Game Analytics Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            border-radius: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .daily-breakdown {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .daily-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .daily-item:last-child {
+            border-bottom: none;
+        }
+        .daily-date {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .daily-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+        }
+        .daily-stat {
+            background: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 15px;
+            color: #34495e;
+        }
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Domino Game Analytics</h1>
+            <p>Track your game's usage and player engagement</p>
+        </div>
+
+        <button class="refresh-btn" onclick="loadAnalytics()">🔄 Refresh Data</button>
+
+        <div id="loading" class="loading">Loading analytics data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPlayers">-</div>
+                    <div class="stat-label">Unique Players (7 days)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalGames">-</div>
+                    <div class="stat-label">Games Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalJoins">-</div>
+                    <div class="stat-label">Total Player Joins</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="roomsCreated">-</div>
+                    <div class="stat-label">Rooms Created</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="voiceMessages">-</div>
+                    <div class="stat-label">Voice Messages Sent</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="tilePlacements">-</div>
+                    <div class="stat-label">Tiles Placed</div>
+                </div>
+            </div>
+
+            <div class="daily-breakdown">
+                <h2>📅 Daily Breakdown</h2>
+                <div id="dailyData"></div>
+            </div>
+
+            <div class="daily-breakdown">
+                <h2>📊 Today's Quick Stats</h2>
+                <div id="todayStats"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadAnalytics() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const content = document.getElementById('content');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            content.style.display = 'none';
+
+            try {
+                const response = await fetch('/analytics?days=7');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to load analytics');
+                }
+
+                updateDashboard(result.data, result.quickStats);
+                
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } catch (err) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = `Error loading analytics: ${err.message}`;
+            }
+        }
+
+        function updateDashboard(data, quickStats) {
+            // Update main stats
+            document.getElementById('totalPlayers').textContent = data.totalPlayers || 0;
+            document.getElementById('totalGames').textContent = data.totalGames || 0;
+            document.getElementById('totalJoins').textContent = data.totalJoins || 0;
+            document.getElementById('roomsCreated').textContent = data.roomsCreated || 0;
+            document.getElementById('voiceMessages').textContent = data.voiceMessages || 0;
+            document.getElementById('tilePlacements').textContent = data.tilePlacements || 0;
+
+            // Update daily breakdown
+            const dailyContainer = document.getElementById('dailyData');
+            dailyContainer.innerHTML = '';
+
+            if (data.dailyBreakdown && Object.keys(data.dailyBreakdown).length > 0) {
+                const sortedDays = Object.keys(data.dailyBreakdown).sort((a, b) => new Date(b) - new Date(a));
+                
+                sortedDays.forEach(date => {
+                    const dayData = data.dailyBreakdown[date];
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'daily-item';
+                    
+                    dayElement.innerHTML = `
+                        <div class="daily-date">${new Date(date).toLocaleDateString()}</div>
+                        <div class="daily-stats">
+                            <span class="daily-stat">👥 ${dayData.uniquePlayers} players</span>
+                            <span class="daily-stat">🎮 ${dayData.games} games</span>
+                            <span class="daily-stat">🚪 ${dayData.joins} joins</span>
+                            <span class="daily-stat">🏠 ${dayData.activeRooms} rooms</span>
+                        </div>
+                    `;
+                    
+                    dailyContainer.appendChild(dayElement);
+                });
+            } else {
+                dailyContainer.innerHTML = '<p style="text-align: center; color: #666;">No data available for the selected period.</p>';
+            }
+
+            // Update today's stats
+            const todayContainer = document.getElementById('todayStats');
+            if (quickStats && quickStats.today) {
+                const today = quickStats.today;
+                todayContainer.innerHTML = `
+                    <div class="daily-item">
+                        <div class="daily-date">Today (${today.date})</div>
+                        <div class="daily-stats">
+                            <span class="daily-stat">👥 ${today.uniquePlayers} unique players</span>
+                            <span class="daily-stat">🚪 ${today.totalJoins} total joins</span>
+                            <span class="daily-stat">🏠 ${today.activeRooms} active rooms</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                todayContainer.innerHTML = '<p style="text-align: center; color: #666;">No data for today yet.</p>';
+            }
+        }
+
+        // Load analytics on page load
+        document.addEventListener('DOMContentLoaded', loadAnalytics);
+
+        // Auto-refresh every 5 minutes
+        setInterval(loadAnalytics, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
