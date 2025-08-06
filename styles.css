@@ -974,3 +974,38 @@ html, body {
     border-radius: 50%;
     object-fit: cover;
 }
+
+/* Logo styling - positioned in middle left */
+#logo-container {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+#game-logo {
+    font-family: Arial, sans-serif;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+#game-logo .by-text {
+    font-size: 0.8em;
+    font-weight: normal;
+    color: #666;
+    font-style: italic;
+}
+
+#game-logo .producer {
+    font-size: 0.9em;
+    color: #007bff;
+    font-weight: bold;
+}

@@ -8,8 +8,11 @@
 </head>
 <body>
     <div id="lobby-container">
+        <div id="logo-container">
+            <div id="game-logo">Domino4 <span class="by-text">by</span> <span class="producer">DAM Productions</span></div>
+        </div>
         <h2>Crear Su Perfil</h2>
-        <button id="show-rules-btn">📖 Reglas del Juego</button>
+        <button id="show-rules-btn">📖 Domino4 - Reglas del Juego</button>
         <div id="profile-status"></div>
         <div class="avatar-flex-row-wrapper">
             <div class="avatar-flex-row">
@@ -45,7 +48,7 @@
             </div>
             <div id="available-rooms"></div>
         </div>
-        <input type="text" id="name-input" placeholder="Su Nombre o Iniciales" maxlength="12">
+        <input type="text" id="name-input" placeholder="Su Nombre o Iniciales" maxlength="9">
         <div class="flex-row">
             <input type="text" id="room-input" placeholder="Sala nombre(opcional)">
             <label for="target-score" class="puntaje-label">Puntaje:</label>
@@ -108,10 +111,11 @@
     <div id="rules-modal">
         <div id="rules-modal-content">
             <button id="close-rules-btn">✖</button>
-            <h2>Reglas del Juego</h2>
+            <h2>Domino4 - Reglas del Juego</h2>
             <ol>
                 <li>El juego es para 4 jugadores en equipos de 2.</li>
                 <li>El juego empieza cuando los 4 jugadores esten inscritos</li>
+                <li>El juego se encarga de rotar las parejas despues de cada match</li>
                 <li>Cada jugador recibe 7 fichas de dominó.</li>
                 <li>El jugador con el doble 6 inicia la partida.</li>
                 <li>Los turnos son en sentido contra del reloj.</li>

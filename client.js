@@ -1214,7 +1214,7 @@ function updateRoomInfo() {
         legendDiv.style.left = '12px';
     }
     if (gameState && gameState.roomId && gameState.targetScore) {
-        legendDiv.textContent = `${gameState.roomId.replace(' ', '-')} A ${gameState.targetScore} puntos`;
+        legendDiv.textContent = `${gameState.roomId.replace(' ', '-')} a ${gameState.targetScore} puntos`;
         legendDiv.style.display = 'block';
     } else if (gameState && gameState.roomId) {
         legendDiv.textContent = gameState.roomId.replace(' ', '-');
