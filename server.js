@@ -1,6 +1,6 @@
 
 // =============================================================================
-// == server.js                                                               ==
+// == server.js          Domino4  -  August 6 by DAM Productions              ==
 // =============================================================================
 const express = require('express');
 const http = require('http');
@@ -416,7 +416,7 @@ function endRound(room, outcome) {
                 if (double6Holder) {
                     room.gameState.lastWinner = double6Holder;
                     const holderDisplayName = room.gameState.jugadoresInfo.find(p => p.name === double6Holder)?.displayName || double6Holder;
-                    endMessage += `\nPróxima mano: ${holderDisplayName} (tiene doble 6) puede jugar cualquier ficha.`;
+                //    endMessage += `\nPróxima mano: ${holderDisplayName} (tiene doble 6) puede jugar cualquier ficha.`;
                 } else {
                     // Fallback: lowest pip count starts
                     const allPipCounts = room.jugadores

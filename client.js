@@ -1,5 +1,5 @@
 // =============================================================================
-// == FINAL LABELED client.js        7/31/2025                                         ==
+// == FINAL LABELED client.js    Domino4 - August 6 by DAM Productions        ==
 // =============================================================================
 // This file handles all client-side logic, including rendering the game with
 // p5.js, communicating with the server via Socket.IO, and managing user input.
@@ -629,7 +629,15 @@ function connectToServer(playerName, avatarData, roomId) {
             if (gameState.gameBlocked) {
                 message = "Juego cerrado ! Nadie puede jugar!";
                 if (gameState.endRoundMessage) {
-                    message = gameState.endRoundMessage + "\n(Juego cerrado)";
+                    // Don't add redundant "(Juego cerrado)" if the server message already indicates a winner
+                    const hasWinnerMessage = gameState.endRoundMessage.toLowerCase().includes('domino') || 
+                                           gameState.endRoundMessage.toLowerCase().includes('gana') ||
+                                           gameState.endRoundMessage.toLowerCase().includes('wins');
+                    if (hasWinnerMessage) {
+                        message = gameState.endRoundMessage; // Use server message as-is when there's a winner
+                    } else {
+                        message = gameState.endRoundMessage + "\n(Juego cerrado)"; // Add blocked info only for ties
+                    }
                 }
                 if (gameState.isTiedBlockedGame) {
                     message += "\n¡Empate! El próximo juego lo inicia quien tenga el doble 6";
