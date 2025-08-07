@@ -1,0 +1,12 @@
+{"timestamp":"2025-08-06T23:44:55.183Z","eventType":"room_created","roomId":"Sala-1","targetScore":70}
+{"timestamp":"2025-08-06T23:44:55.183Z","eventType":"player_join","playerName":"Jugador 1","roomId":"Sala-1","displayName":"da","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"}
+{"timestamp":"2025-08-06T23:45:29.358Z","eventType":"room_created","roomId":"Sala-2","targetScore":70}
+{"timestamp":"2025-08-06T23:45:29.358Z","eventType":"player_join","playerName":"Jugador 1","roomId":"Sala-2","displayName":"da","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"}
+{"timestamp":"2025-08-06T23:45:36.832Z","eventType":"player_join","playerName":"Jugador 2","roomId":"Sala-2","displayName":"fv","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"}
+{"timestamp":"2025-08-06T23:45:43.614Z","eventType":"player_join","playerName":"Jugador 3","roomId":"Sala-2","displayName":"lk","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"}
+{"timestamp":"2025-08-06T23:45:49.623Z","eventType":"player_join","playerName":"Jugador 4","roomId":"Sala-2","displayName":"kk","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"}
+{"timestamp":"2025-08-06T23:46:27.613Z","eventType":"tile_placed","roomId":"Sala-2","playerName":"Jugador 2","tile":{"left":6,"right":6},"position":"right"}
+{"timestamp":"2025-08-06T23:46:36.068Z","eventType":"tile_placed","roomId":"Sala-2","playerName":"Jugador 4","tile":{"left":6,"right":5},"position":"right"}
+{"timestamp":"2025-08-06T23:46:40.189Z","eventType":"tile_placed","roomId":"Sala-2","playerName":"Jugador 1","tile":{"left":5,"right":3},"position":"right"}
+{"timestamp":"2025-08-06T23:46:43.487Z","eventType":"tile_placed","roomId":"Sala-2","playerName":"Jugador 3","tile":{"left":3,"right":3},"position":"right"}
+{"timestamp":"2025-08-06T23:46:49.001Z","eventType":"tile_placed","roomId":"Sala-2","playerName":"Jugador 2","tile":{"left":0,"right":6},"position":"left"}

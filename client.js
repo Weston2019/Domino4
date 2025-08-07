@@ -56,6 +56,78 @@ let avatarCache = {}; // Cache to prevent repeated avatar loading attempts
 let dialogShownTimestamp = 0; // Prevent dialog from being hidden too quickly
 let passSound; // Sound played when a player passes their turn
 let winSound; // Sound played when a player wins the hand (domino)
+let playerPointsWon = {}; // Track points won by each player across matches
+let previousTeamScores = { teamA: 0, teamB: 0 }; // Track previous match scores for point calculation
+
+// Function to save points to localStorage as backup
+function savePointsToLocalStorage() {
+    try {
+        const pointsData = {
+            playerPointsWon: playerPointsWon,
+            previousTeamScores: previousTeamScores,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('domino_game_points', JSON.stringify(pointsData));
+        console.log('💾 Points saved to localStorage as backup');
+    } catch (error) {
+        console.warn('⚠️ Failed to save points to localStorage:', error);
+    }
+}
+
+// Function to restore points from localStorage on reconnection
+function restorePointsFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('domino_game_points');
+        if (saved) {
+            const pointsData = JSON.parse(saved);
+            // Only restore if the data is recent (within last hour)
+            if (pointsData.timestamp && (Date.now() - pointsData.timestamp) < 3600000) {
+                playerPointsWon = pointsData.playerPointsWon || {};
+                previousTeamScores = pointsData.previousTeamScores || { teamA: 0, teamB: 0 };
+                console.log('🔄 Points restored from localStorage backup:', playerPointsWon);
+                return true;
+            } else {
+                console.log('⚠️ Stored points data too old, starting fresh');
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ Failed to restore points from localStorage:', error);
+    }
+    return false;
+}
+
+// Function to completely clear all points data (for game restart)
+function clearAllPointsData() {
+    console.log('🗑️ Clearing all points data...');
+    
+    // Clear local tracking
+    playerPointsWon = {};
+    previousTeamScores = { teamA: 0, teamB: 0 };
+    
+    // Clear localStorage backup
+    try {
+        localStorage.removeItem('domino_game_points');
+        console.log('🗑️ Cleared points data from localStorage');
+    } catch (error) {
+        console.warn('⚠️ Failed to clear points from localStorage:', error);
+    }
+    
+    // Update points table to show zeros immediately
+    if (window.updatePointsTableContent) {
+        setTimeout(() => {
+            window.updatePointsTableContent();
+        }, 100);
+    }
+    
+    console.log('✅ All points data cleared successfully');
+}
+
+// Add global function for manual clearing (accessible from browser console)
+window.clearGamePoints = function() {
+    console.log('🛠️ Manual points clear requested');
+    clearAllPointsData();
+    alert('Points cleared! The PUNTOS table should now show 0 for all players.');
+};
 
 // Voice chat variables
 let mediaRecorder;
@@ -72,14 +144,20 @@ let isRecording = false;
  */
 function preload() {
     soundFormats('mp3');
-    tileSound = loadSound('assets/sounds/tile_place.mp3');
-    passSound = loadSound('assets/sounds/pass_turn.mp3'); 
-    winSound = loadSound('assets/sounds/win_bell.mp3');
     
-    // Set volume levels (0.0 to 1.0, where 1.0 is maximum)
-    if (passSound) passSound.setVolume(1.0); // Increase pass sound volume
-    if (tileSound) tileSound.setVolume(0.6); // Optional: adjust tile sound
-    if (winSound) winSound.setVolume(0.7);   // Optional: adjust win sound
+    // Load sounds with error handling
+    tileSound = loadSound('assets/sounds/tile_place.mp3', 
+        () => console.log('✅ Tile sound loaded successfully'),
+        (error) => console.error('❌ Failed to load tile sound:', error)
+    );
+    passSound = loadSound('assets/sounds/pass_turn.mp3',
+        () => console.log('✅ Pass sound loaded successfully'),
+        (error) => console.error('❌ Failed to load pass sound:', error)
+    ); 
+    winSound = loadSound('assets/sounds/win_bell.mp3',
+        () => console.log('✅ Win sound loaded successfully'),
+        (error) => console.error('❌ Failed to load win sound:', error)
+    );
 }
 /**
  * (p5.js function) Automatically called when the browser window is resized.
@@ -94,7 +172,10 @@ function setup() {
     const canvas = createCanvas(windowWidth, windowHeight);
     canvas.parent('canvas-container');
     
-    // AGGRESSIVE: Hide new round container immediately on page load
+    // Initialize audio context and set up sounds
+    setupAudio();
+    
+    // Hide new round container immediately on page load
     const newRoundContainer = document.getElementById('new-round-container');
     if (newRoundContainer) {
         newRoundContainer.style.display = 'none !important';
@@ -105,6 +186,54 @@ function setup() {
     
     setupLobby();
     setupButtonListeners();
+}
+
+function setupAudio() {
+    // Set up audio context initialization on first user interaction
+    let audioInitialized = false;
+    
+    const initializeAudio = () => {
+        if (!audioInitialized) {
+            console.log('🔊 Initializing audio context...');
+            
+            // Initialize audio context
+            if (getAudioContext().state === 'suspended') {
+                userStartAudio().then(() => {
+                    console.log('✅ Audio context started');
+                    setSoundVolumes();
+                }).catch(err => console.error('❌ Failed to start audio context:', err));
+            } else {
+                setSoundVolumes();
+            }
+            
+            audioInitialized = true;
+            // Remove the event listeners after first use
+            document.removeEventListener('click', initializeAudio);
+            document.removeEventListener('keydown', initializeAudio);
+        }
+    };
+    
+    // Add event listeners for user interaction
+    document.addEventListener('click', initializeAudio);
+    document.addEventListener('keydown', initializeAudio);
+}
+
+function setSoundVolumes() {
+    // Set volume levels after sounds are loaded
+    setTimeout(() => {
+        if (tileSound && tileSound.isLoaded()) {
+            tileSound.setVolume(0.7);
+            console.log('🔊 Tile sound volume set');
+        }
+        if (passSound && passSound.isLoaded()) {
+            passSound.setVolume(0.8);
+            console.log('🔊 Pass sound volume set');
+        }
+        if (winSound && winSound.isLoaded()) {
+            winSound.setVolume(0.9);
+            console.log('🔊 Win sound volume set');
+        }
+    }, 500);
 }
 
 /**
@@ -120,6 +249,12 @@ function draw() {
         updateRoomInfo();
         updateScoreboard();
         updateMatchesWon();
+        
+        // Ensure points table exists during active gameplay
+        if (!document.getElementById('points-table-container') && gameState.jugadoresInfo && gameState.jugadoresInfo.length > 0) {
+            createPointsTableNow();
+        }
+        
         if (gameState.board && gameState.board.length > 0) {
             drawBoard();
         }
@@ -572,6 +707,28 @@ function connectToServer(playerName, avatarData, roomId) {
 
     socket.on('connect', () => {
         console.log("Connected to server.");
+        
+        // AGGRESSIVE CLEAR: Clear points immediately on fresh connection to ensure clean start
+        console.log('🧹 Clearing any cached points data on fresh connection');
+        playerPointsWon = {};
+        previousTeamScores = { teamA: 0, teamB: 0 };
+        
+        // Only try to restore points from localStorage if we detect this is truly a reconnection
+        // (we'll be more conservative about restoring to avoid stale data)
+        const restored = restorePointsFromLocalStorage();
+        if (restored) {
+            console.log('📦 Restored points from recent session (within 1 hour)');
+        } else {
+            console.log('🆕 Starting with completely fresh points data');
+            // Force clear localStorage just in case
+            try {
+                localStorage.removeItem('domino_game_points');
+                console.log('🗑️ Force cleared old localStorage points data');
+            } catch (error) {
+                console.warn('⚠️ Could not clear localStorage:', error);
+            }
+        }
+        
         socket.emit('setPlayerName', { name: playerName, avatar: avatarData, roomId: roomId, targetScore: targetScore });
 
         // Hide lobby and show game UI when connected
@@ -579,11 +736,32 @@ function connectToServer(playerName, avatarData, roomId) {
         const gameUI = document.getElementById('game-ui');
         if (lobby) lobby.style.display = 'none';
         if (gameUI) gameUI.style.display = 'block';
+        
+        // Create points table when game UI becomes visible
+        setTimeout(() => {
+            createPointsTableNow();
+        }, 500);
     });
 
     socket.on('playerAssigned', (name) => { myJugadorName = name; });
 
     socket.on('gameState', (state) => {
+        // Check if this is a brand new game or initial connection
+        const wasGameState = !!gameState && !!gameState.matchNumber;
+        const isNewGame = !wasGameState || 
+                         (state.matchNumber === 1 && (!state.teamScores || (state.teamScores.teamA === 0 && state.teamScores.teamB === 0)));
+        
+        // AGGRESSIVE CLEARING: Clear points on any of these conditions
+        const shouldClearPoints = isNewGame || 
+                                 !wasGameState || // First gameState received
+                                 (state.matchNumber === 1 && wasGameState && gameState.matchNumber > 1); // Match reset to 1
+        
+        if (shouldClearPoints) {
+            console.log('🆕 New game/session detected - clearing all points data');
+            console.log(`Previous match: ${gameState.matchNumber || 'none'}, New match: ${state.matchNumber}`);
+            clearAllPointsData();
+        }
+        
         gameState = state;
         // (Removed points-objective update here; now handled by updateRoomInfo for compact legend)
         const newRoundContainer = document.getElementById('new-round-container');
@@ -640,7 +818,7 @@ function connectToServer(playerName, avatarData, roomId) {
                     }
                 }
                 if (gameState.isTiedBlockedGame) {
-                    message += "\n¡Empate! El próximo juego lo inicia quien tenga el doble 6";
+                    message += "\nEl próximo juego lo inicia quien tenga el doble 6";
                 }
             } else if (gameState.endRoundMessage && gameState.jugadoresInfo) {
                 const playersWithTiles = gameState.jugadoresInfo.filter(player => player.tileCount > 0);
@@ -650,7 +828,7 @@ function connectToServer(playerName, avatarData, roomId) {
                 if (hasBlockedMessage || (playersWithTiles.length > 1 && playersWithNoTiles.length === 0 && !hasWinMessage)) {
                     message = gameState.endRoundMessage;
                     if (gameState.isTiedBlockedGame) {
-                        message += "\n¡Empate! El próximo juego lo inicia quien tenga el doble 6";
+                        message += "\nEl próximo juego lo inicia quien tenga el doble 6";
                     }
                 } else {
                     message = gameState.endRoundMessage;
@@ -665,35 +843,58 @@ function connectToServer(playerName, avatarData, roomId) {
             } else if (gameState.endRoundMessage) {
                 message = gameState.endRoundMessage;
             } else if (gameState.gameOver) {
-                message = "Game Over";
+                message = "Juego Terminado";
             } else if (gameState.roundOver) {
-                message = "Round Over";
+                message = "Mano Finalizada";
             }
             roundOverMessageDiv.innerText = message;
-            roundOverMessageDiv.style.setProperty('display', 'block', 'important');
-            roundOverMessageDiv.style.setProperty('visibility', 'visible', 'important');
-            roundOverMessageDiv.style.setProperty('opacity', '1', 'important');
-            roundOverMessageDiv.style.setProperty('color', 'white', 'important');
-            roundOverMessageDiv.style.setProperty('font-size', '16px', 'important');
-            roundOverMessageDiv.style.setProperty('text-align', 'center', 'important');
-            roundOverMessageDiv.style.setProperty('padding', '20px', 'important');
-            newRoundContainer.style.setProperty('display', 'block', 'important');
-            newRoundContainer.style.setProperty('visibility', 'visible', 'important');
-            newRoundContainer.style.setProperty('opacity', '1', 'important');
-            newRoundContainer.style.setProperty('z-index', '9999', 'important');
-            newRoundContainer.style.setProperty('position', 'fixed', 'important');
-            newRoundContainer.style.setProperty('pointer-events', 'auto', 'important');
-            const body = document.body;
-            const html = document.documentElement;
-            body.style.setProperty('overflow', 'hidden', 'important');
-            html.style.setProperty('overflow', 'hidden', 'important');
+            
+            // Show dialog with simplified styling (using !important to override other styles)
+            const dialogStyle = {
+                display: 'block !important',
+                visibility: 'visible !important', 
+                opacity: '1 !important',
+                color: 'white !important',
+                fontSize: '16px !important',
+                textAlign: 'center !important',
+                padding: '20px !important'
+            };
+            
+            const containerStyle = {
+                display: 'block !important',
+                visibility: 'visible !important',
+                opacity: '1 !important', 
+                zIndex: '9999 !important',
+                position: 'fixed !important',
+                pointerEvents: 'auto !important'
+            };
+            
+            const buttonStyle = {
+                display: 'block !important',
+                visibility: 'visible !important',
+                opacity: '1 !important',
+                pointerEvents: 'auto !important'
+            };
+            
+            // Apply styles using setProperty with !important
+            Object.entries(dialogStyle).forEach(([prop, value]) => {
+                roundOverMessageDiv.style.setProperty(prop.replace(/([A-Z])/g, '-$1').toLowerCase(), value.replace(' !important', ''), 'important');
+            });
+            Object.entries(containerStyle).forEach(([prop, value]) => {
+                newRoundContainer.style.setProperty(prop.replace(/([A-Z])/g, '-$1').toLowerCase(), value.replace(' !important', ''), 'important');
+            });
+            Object.entries(buttonStyle).forEach(([prop, value]) => {
+                newRoundBtn.style.setProperty(prop.replace(/([A-Z])/g, '-$1').toLowerCase(), value.replace(' !important', ''), 'important');
+            });
+            
+            // Prevent page scrolling
+            document.body.style.setProperty('overflow', 'hidden', 'important');
+            document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+            
             const amIReady = gameState.readyPlayers && gameState.readyPlayers.includes(myJugadorName);
             newRoundBtn.disabled = amIReady;
             newRoundBtn.innerText = amIReady ? 'Esperando por los demas...' : (gameState.matchOver ? 'Jugar Match Nuevo' : 'Empezar Mano Nueva');
-            newRoundBtn.style.setProperty('display', 'block', 'important');
-            newRoundBtn.style.setProperty('visibility', 'visible', 'important');
-            newRoundBtn.style.setProperty('opacity', '1', 'important');
-            newRoundBtn.style.setProperty('pointer-events', 'auto', 'important');
+            
             if (dialogShownTimestamp === 0) {
                 dialogShownTimestamp = Date.now();
             }
@@ -727,28 +928,59 @@ function connectToServer(playerName, avatarData, roomId) {
     });
 
     socket.on('tilePlaced', (data) => {
+        console.log('🔊 Tile placed event received');
         if (tileSound && tileSound.isLoaded()) {
-            tileSound.play();
+            try {
+                tileSound.play();
+                console.log('🔊 Tile sound played');
+            } catch (error) {
+                console.error('❌ Error playing tile sound:', error);
+            }
+        } else {
+            console.warn('⚠️ Tile sound not loaded or not available');
         }
     });
 
     socket.on('playerPassed', (data) => {
+        console.log('🔊 Player passed event received');
         if (passSound && passSound.isLoaded()) {
-            passSound.play();
+            try {
+                passSound.play();
+                console.log('🔊 Pass sound played');
+            } catch (error) {
+                console.error('❌ Error playing pass sound:', error);
+            }
+        } else {
+            console.warn('⚠️ Pass sound not loaded or not available');
         }
     });
 
     socket.on('playerWonHand', (data) => {
+        console.log('🔊 Player won hand event received');
         if (winSound && winSound.isLoaded()) {
-            winSound.play();
+            try {
+                winSound.play();
+                console.log('🔊 Win sound played');
+            } catch (error) {
+                console.error('❌ Error playing win sound:', error);
+            }
+        } else {
+            console.warn('⚠️ Win sound not loaded or not available');
         }
     });
 
     socket.on('gameRestarted', (data) => {
+        // Clear game state
         myPlayerHand = [];
         selectedTileIndex = null;
         messageDisplay = { text: '', time: 0 };
+        
+        // CLEAR ALL POINTS DATA on game restart
+        clearAllPointsData();
+        
         showMessage(`🔄 ${data.message}`);
+        console.log('🔄 Game restarted - all points data cleared');
+        
         const messagesDiv = document.getElementById('chat-messages');
         const messageElement = document.createElement('p');
         messageElement.innerHTML = `<b>SISTEMA:</b> 🔄 Juego reiniciado por ${data.restartedBy}`;
@@ -1023,7 +1255,11 @@ function updatePlayersUI() {
         if (div) div.style.display = 'none';
     });
 
-    if (Object.keys(playerPositions).length < 4) return;
+    if (Object.keys(playerPositions).length < 4) {
+        // Even if we can't position players properly, still show the points table
+        createPointsTable({});
+        return;
+    }
 
     Object.entries(playerPositions).forEach(([playerName, position]) => {
         const div = document.getElementById(`player-display-${position}`);
@@ -1129,7 +1365,7 @@ function updatePlayersUI() {
         const tinyTilesDisplay = createTinyTilesDisplay(playerData.tileCount);
         tileCountDiv.appendChild(tinyTilesDisplay);
         
-        // Append both divs to infoDiv
+        // Append all divs to infoDiv (removed individual points display)
         infoDiv.appendChild(nameDiv);
         infoDiv.appendChild(tileCountDiv);
 
@@ -1139,6 +1375,292 @@ function updatePlayersUI() {
         div.classList.toggle('current-turn', playerData.name === gameState.currentTurn);
         div.classList.toggle('disconnected', !playerData.isConnected);
     });
+
+    // Update our points table if it exists
+    if (window.updatePointsTableContent) {
+        window.updatePointsTableContent();
+    } else {
+        // Create the points table now if it doesn't exist yet
+        setTimeout(() => {
+            createPointsTableNow();
+        }, 100);
+    }
+}
+
+function createPointsTableNow() {
+    console.log('Creating points table now');
+    
+    // Remove any existing table first
+    const existingTable = document.getElementById('points-table-container');
+    if (existingTable) existingTable.remove();
+    
+    // Create the points table
+    let pointsTable = document.createElement('div');
+    pointsTable.id = 'points-table-container';
+    pointsTable.style.cssText = `
+        position: fixed;
+        bottom: 50px;
+        right: 20px;
+        background: rgba(139, 117, 86, 0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        min-width: 150px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        border: 1px solid #8B7556;
+        z-index: 9999;
+        font-family: Arial, sans-serif;
+    `;
+    
+    pointsTable.innerHTML = `
+        <div style="font-weight: bold; text-align: center; margin-bottom: 6px; border-bottom: 1px solid #A0926B; padding-bottom: 3px; color: #F0F0F0; font-size: 13px;">🏆 PUNTOS</div>
+        <div id="points-table-content" style="color: #E0E0E0; font-size: 11px;">Esperando datos del juego...</div>
+    `;
+    
+    document.body.appendChild(pointsTable);
+    console.log('Points table created');
+    
+    // Create global update function
+    window.updatePointsTableContent = function() {
+        const contentDiv = document.getElementById('points-table-content');
+        if (!contentDiv) return;
+        
+        if (!gameState || !gameState.jugadoresInfo || gameState.jugadoresInfo.length === 0) {
+            contentDiv.innerHTML = '<div style="color: #C0C0C0;">Esperando datos del juego...</div>';
+            return;
+        }
+        
+        // Add debugging to see what points data we're getting
+        console.log('🎯 Points Table Debug - GameState jugadoresInfo:', gameState.jugadoresInfo);
+        console.log('🎯 Points Table Debug - Team Scores:', gameState.teamScores);
+        console.log('🎯 Points Table Debug - Teams:', gameState.teams);
+        
+        // CHECK MATCH COMPLETION ONCE (outside of player loop)
+        const currentTotalA = gameState.teamScores?.teamA || 0;
+        const currentTotalB = gameState.teamScores?.teamB || 0;
+        const previousTotalA = previousTeamScores.teamA;
+        const previousTotalB = previousTeamScores.teamB;
+        
+        // Only award points when a match is completed (not just after each hand/round)
+        const isMatchCompleted = gameState.matchOver || gameState.endMatchMessage || gameState.gameOver;
+        const scoresChanged = (currentTotalA > previousTotalA || currentTotalB > previousTotalB);
+        
+        let matchPointsAwarded = false;
+        
+        // If match completed, calculate winning team and points to award
+        let winningTeamPoints = 0;
+        let winningTeamPlayers = [];
+        if (isMatchCompleted && scoresChanged && gameState.teamScores && gameState.teams) {
+            const scoreDifference = Math.abs(currentTotalA - currentTotalB);
+            let isShutout = false; // Track if this is a shutout (losing team has 0 points)
+            
+            if (currentTotalA > currentTotalB) {
+                // Team A won
+                winningTeamPoints = scoreDifference;
+                winningTeamPlayers = gameState.teams.teamA || [];
+                isShutout = currentTotalB === 0; // Team B was shut out
+                console.log(`🏆 MATCH COMPLETED - Team A wins with ${scoreDifference} points!${isShutout ? ' (SHUTOUT!)' : ''}`);
+            } else if (currentTotalB > currentTotalA) {
+                // Team B won  
+                winningTeamPoints = scoreDifference;
+                winningTeamPlayers = gameState.teams.teamB || [];
+                isShutout = currentTotalA === 0; // Team A was shut out
+                console.log(`🏆 MATCH COMPLETED - Team B wins with ${scoreDifference} points!${isShutout ? ' (SHUTOUT!)' : ''}`);
+            }
+            
+            // DOUBLE POINTS FOR SHUTOUT: If the losing team has 0 points, double the points awarded
+            if (isShutout && winningTeamPoints > 0) {
+                winningTeamPoints *= 2;
+                console.log(`🔥 SHUTOUT BONUS! Points doubled to ${winningTeamPoints} for shutting out the opposing team!`);
+            }
+            
+            // Award points to all winning team players
+            if (winningTeamPoints > 0 && winningTeamPlayers.length > 0) {
+                winningTeamPlayers.forEach(playerName => {
+                    if (!playerPointsWon[playerName]) {
+                        playerPointsWon[playerName] = 0;
+                    }
+                    playerPointsWon[playerName] += winningTeamPoints;
+                    console.log(`🏆 Awarding ${winningTeamPoints} points to ${playerName}`);
+                });
+                
+                // Update our tracking of previous scores (only once)
+                previousTeamScores.teamA = currentTotalA;
+                previousTeamScores.teamB = currentTotalB;
+                matchPointsAwarded = true;
+                
+                // Save to localStorage as backup
+                savePointsToLocalStorage();
+            }
+        }
+        
+        // Create array with player data and calculate CUMULATIVE points across all matches
+        const playersWithPoints = gameState.jugadoresInfo.map(player => {
+            let cumulativePoints = 0;
+            
+            // Get cumulative points from previous games if available
+            if (player.pointsWon !== undefined) {
+                cumulativePoints = player.pointsWon;
+                // Sync server data with local tracking to maintain consistency
+                playerPointsWon[player.name] = cumulativePoints;
+                console.log(`Player ${player.displayName}: Using server cumulative points = ${cumulativePoints}`);
+            } else {
+                // If no server data exists, check if we have local tracking for this player
+                if (!playerPointsWon[player.name]) {
+                    playerPointsWon[player.name] = 0;
+                    
+                    // SYNC MECHANISM: If this is a reconnection scenario, try to infer points
+                    // from team scores and match completion status
+                    if (gameState.matchNumber > 1 || (gameState.teamScores && 
+                        (gameState.teamScores.teamA > 0 || gameState.teamScores.teamB > 0))) {
+                        console.log(`🔄 Player ${player.displayName} may have reconnected, checking for missed points...`);
+                        
+                        // Try to calculate what points this player should have based on match history
+                        // This is a basic approximation - in a real system, the server should track this
+                        if (gameState.teamScores && gameState.teams && gameState.matchNumber > 1) {
+                            const teamAScore = gameState.teamScores.teamA || 0;
+                            const teamBScore = gameState.teamScores.teamB || 0;
+                            
+                            // If one team has significantly more points, assume completed matches
+                            if (teamAScore >= 70 || teamBScore >= 70) {
+                                if (gameState.teams.teamA && gameState.teams.teamA.includes(player.name)) {
+                                    // Estimate points for Team A player based on completed matches
+                                    const estimatedPoints = Math.floor(teamAScore / 70) * (teamAScore > teamBScore ? Math.abs(teamAScore - teamBScore) : 0);
+                                    playerPointsWon[player.name] = estimatedPoints;
+                                    console.log(`🔄 Estimated ${estimatedPoints} points for reconnected Team A player ${player.displayName}`);
+                                } else if (gameState.teams.teamB && gameState.teams.teamB.includes(player.name)) {
+                                    // Estimate points for Team B player based to completed matches
+                                    const estimatedPoints = Math.floor(teamBScore / 70) * (teamBScore > teamAScore ? Math.abs(teamBScore - teamAScore) : 0);
+                                    playerPointsWon[player.name] = estimatedPoints;
+                                    console.log(`🔄 Estimated ${estimatedPoints} points for reconnected Team B player ${player.displayName}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Use the current cumulative points (which may have been updated by the match completion logic above)
+                cumulativePoints = playerPointsWon[player.name];
+                console.log(`Player ${player.displayName}: Final cumulative points = ${cumulativePoints}`);
+            }
+            
+            return {
+                displayName: player.displayName,
+                points: cumulativePoints
+            };
+        }).sort((a, b) => b.points - a.points);
+        
+        let html = '';
+        playersWithPoints.forEach((player, index) => {
+            const rank = index + 1;
+            let rankIcon = '';
+            let rankColor = '#E0E0E0';
+            
+            // Add rank icons and colors
+            switch(rank) {
+                case 1:
+                    rankIcon = '🥇';
+                    rankColor = '#FFD700'; // Gold
+                    break;
+                case 2:
+                    rankIcon = '🥈';
+                    rankColor = '#C0C0C0'; // Silver
+                    break;
+                case 3:
+                    rankIcon = '🥉';
+                    rankColor = '#CD7F32'; // Bronze
+                    break;
+                case 4:
+                    rankIcon = '4️⃣';
+                    rankColor = '#A0A0A0'; // Gray
+                    break;
+            }
+            
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0; color: white; font-size: 11px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 14px;">${rankIcon}</span>
+                        <span style="color: ${rankColor}; font-weight: bold; font-size: 10px;">${rank}.</span>
+                        <span style="color: #E0E0E0;">${player.displayName}</span>
+                    </div>
+                    <span style="color: #FFF; font-weight: bold;">${player.points}</span>
+                </div>
+            `;
+        });
+        
+        contentDiv.innerHTML = html;
+        console.log('Points table updated with rankings');
+    };
+    
+    // Update immediately if we have data
+    if (gameState && gameState.jugadoresInfo) {
+        window.updatePointsTableContent();
+    }
+}
+
+// EMERGENCY FUNCTION DISABLED - Cleaned up for production
+/*
+window.forceCreatePointsTable = function() {
+    console.log('🚨 EMERGENCY: Force creating points table!');
+    
+    // Remove any existing table first
+    const existingTable = document.getElementById('points-table-container');
+    if (existingTable) {
+        console.log('🗑️ Removing existing table');
+        existingTable.remove();
+    }
+    
+    // SIMPLE TEST: Create table in center of screen
+    let pointsTable = document.createElement('div');
+    pointsTable.id = 'points-table-container';
+    pointsTable.style.cssText = `
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        background: rgba(255, 0, 0, 1) !important;
+        color: white !important;
+        padding: 30px !important;
+        border-radius: 8px !important;
+        font-size: 20px !important;
+        min-width: 300px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8) !important;
+        border: 8px solid yellow !important;
+        z-index: 999999 !important;
+        font-family: Arial, sans-serif !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        text-align: center !important;
+    `;
+    
+    pointsTable.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 20px; color: white; font-size: 24px;">🏆 POINTS TABLE TEST 🏆</div>
+        <div style="color: white; font-size: 18px; margin-bottom: 15px;">CENTER OF SCREEN!</div>
+        <div id="points-table-content" style="color: white; font-size: 16px; font-weight: bold;">
+            <div>da: 0 points</div>
+            <div>fv: 0 points</div>
+            <div>lk: 0 points</div>
+            <div>kk: 0 points</div>
+        </div>
+        <div style="margin-top: 20px; color: yellow; font-size: 14px;">Click the red button again to close</div>
+    `;
+    
+    // Add click to close
+    pointsTable.onclick = function() {
+        this.remove();
+    };
+    
+    document.body.appendChild(pointsTable);
+    console.log('Emergency function disabled');
+};
+*/
+
+function createPointsTable(playerPositions) {
+    // This old function is now disabled - the real table is created in setup()
+    console.log('Old createPointsTable called - using new immediate table instead');
 }
 
 function updateTeamInfo() {
@@ -1418,14 +1940,62 @@ function updateMatchesWon() {
     }
 
     container.style.display = 'block';
-    let matchesWonHtml = '<b><div style="text-align: left; line-height: 1.2;">Juegos<br>Ganados</div></b>';
+    
+    // Create a more compact, grid-style layout
+    let matchesWonHtml = `
+        <div style="
+            background: rgba(0, 0, 0, 0.7); 
+            padding: 8px; 
+            border-radius: 6px; 
+            font-size: 11px;
+            min-width: 102px;
+            border: 1px solid #444;
+        ">
+            <div style="
+                font-weight: bold; 
+                text-align: center; 
+                margin-bottom: -2px; 
+                color: #FFD700;
+                font-size: 11px;
+                border-bottom: 1px solid #666;
+                padding-bottom: 3px;
+                line-height: 1.1;
+            ">🏆<br>JUEGOS<br>GANADOS</div>
+    `;
 
     gameState.jugadoresInfo.forEach(playerInfo => {
         const stats = gameState.playerStats ? gameState.playerStats[playerInfo.name] : null;
         const wins = stats ? stats.matchesWon : 0;
-        matchesWonHtml += `<p>${playerInfo.displayName}: ${wins}</p>`;
+        
+        // Truncate name to fit in 9 characters max
+        const displayName = playerInfo.displayName.length > 8 
+            ? playerInfo.displayName.substring(0, 8) + '…' 
+            : playerInfo.displayName;
+            
+        matchesWonHtml += `
+            <div style="
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;
+                margin: 1px 0; 
+                padding: 1px 3px;
+                font-size: 10px;
+                line-height: 1.2;
+            ">
+                <span style="color: #E0E0E0; font-weight: normal;">${displayName}</span>
+                <span style="
+                    color: #FFF; 
+                    font-weight: bold; 
+                    background: rgba(255, 255, 255, 0.1);
+                    padding: 1px 4px;
+                    border-radius: 3px;
+                    font-size: 10px;
+                ">${wins}</span>
+            </div>
+        `;
     });
 
+    matchesWonHtml += '</div>';
     container.innerHTML = matchesWonHtml;
 }
 
@@ -1989,3 +2559,5 @@ function playVoiceMessage(data) {
         console.error("🎵 Error processing voice message:", error);
     }
 }
+
+
