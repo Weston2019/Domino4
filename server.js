@@ -897,6 +897,170 @@ app.post('/save-avatar', express.json({ limit: '1mb' }), (req, res) => {
     });
 });
 
+// Endpoint to submit suggestions
+app.post('/submit-suggestion', express.json({ limit: '1mb' }), (req, res) => {
+    try {
+        const { suggestion, timestamp, userAgent, language } = req.body;
+        
+        if (!suggestion || suggestion.trim().length < 10) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Suggestion must be at least 10 characters long' 
+            });
+        }
+        
+        // Create suggestions directory if it doesn't exist
+        const suggestionsDir = path.join(__dirname, 'suggestions');
+        if (!fs.existsSync(suggestionsDir)) {
+            fs.mkdirSync(suggestionsDir, { recursive: true });
+        }
+        
+        // Create suggestion object
+        const suggestionData = {
+            id: Date.now().toString(),
+            suggestion: suggestion.trim().substring(0, 500),
+            timestamp: timestamp || new Date().toISOString(),
+            userAgent: userAgent || 'Unknown',
+            language: language || 'Unknown',
+            ip: req.ip || req.connection.remoteAddress || 'Unknown'
+        };
+        
+        // Save to daily file
+        const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const filename = path.join(suggestionsDir, `suggestions-${date}.json`);
+        
+        let suggestions = [];
+        if (fs.existsSync(filename)) {
+            try {
+                const existingData = fs.readFileSync(filename, 'utf8');
+                suggestions = JSON.parse(existingData);
+            } catch (error) {
+                console.error('Error reading existing suggestions:', error);
+                suggestions = [];
+            }
+        }
+        
+        suggestions.push(suggestionData);
+        
+        // Write back to file
+        fs.writeFileSync(filename, JSON.stringify(suggestions, null, 2));
+        
+        console.log(`📝 New suggestion saved: ${suggestionData.id}`);
+        console.log(`💡 Suggestion preview: "${suggestion.substring(0, 50)}${suggestion.length > 50 ? '...' : ''}"`);
+        
+        // Track suggestion for analytics if available
+        if (analytics && analytics.trackSuggestion) {
+            analytics.trackSuggestion(suggestionData.id, suggestion.length)
+                .catch(err => console.error('Analytics suggestion tracking error:', err));
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Suggestion saved successfully',
+            id: suggestionData.id 
+        });
+        
+    } catch (error) {
+        console.error('Error saving suggestion:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Internal server error' 
+        });
+    }
+});
+
+// Endpoint to view suggestions (for admin/developer)
+app.get('/suggestions', (req, res) => {
+    try {
+        const suggestionsDir = path.join(__dirname, 'suggestions');
+        
+        if (!fs.existsSync(suggestionsDir)) {
+            return res.json({ suggestions: [], message: 'No suggestions directory found' });
+        }
+        
+        const files = fs.readdirSync(suggestionsDir)
+            .filter(file => file.startsWith('suggestions-') && file.endsWith('.json'))
+            .sort()
+            .reverse(); // Most recent first
+        
+        let allSuggestions = [];
+        
+        files.forEach(file => {
+            try {
+                const filepath = path.join(suggestionsDir, file);
+                const data = fs.readFileSync(filepath, 'utf8');
+                const suggestions = JSON.parse(data);
+                allSuggestions = allSuggestions.concat(suggestions);
+            } catch (error) {
+                console.error(`Error reading suggestions file ${file}:`, error);
+            }
+        });
+        
+        // Sort by timestamp, most recent first
+        allSuggestions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        // Create simple HTML response
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Domino4 - Buzón de Sugerencias</title>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+                .header { background: #28a745; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+                .suggestion { background: white; border-left: 4px solid #28a745; margin: 10px 0; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                .meta { color: #666; font-size: 12px; margin-bottom: 10px; }
+                .text { color: #333; line-height: 1.4; }
+                .stats { background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                .no-suggestions { text-align: center; color: #666; font-style: italic; padding: 40px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🎯 Domino4 - Buzón de Sugerencias</h1>
+                <p>Feedback y sugerencias de los usuarios</p>
+            </div>
+            
+            <div class="stats">
+                <strong>📊 Estadísticas:</strong> ${allSuggestions.length} sugerencias totales
+                ${files.length > 0 ? ` | Archivos: ${files.length} días` : ''}
+            </div>
+        `;
+        
+        if (allSuggestions.length === 0) {
+            html += '<div class="no-suggestions">📭 No hay sugerencias aún</div>';
+        } else {
+            allSuggestions.forEach((suggestion, index) => {
+                const date = new Date(suggestion.timestamp).toLocaleString('es-ES');
+                html += `
+                <div class="suggestion">
+                    <div class="meta">
+                        📅 ${date} | 🆔 ${suggestion.id} | 🌍 ${suggestion.language} | 💻 ${suggestion.userAgent ? suggestion.userAgent.substring(0, 50) + '...' : 'Unknown'}
+                    </div>
+                    <div class="text">${suggestion.suggestion}</div>
+                </div>
+                `;
+            });
+        }
+        
+        html += `
+            <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
+                🔄 Página actualizada automáticamente cada 30 segundos
+                <script>setTimeout(() => location.reload(), 30000);</script>
+            </div>
+        </body>
+        </html>
+        `;
+        
+        res.send(html);
+        
+    } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        res.status(500).json({ success: false, error: 'Error fetching suggestions' });
+    }
+});
+
 // =============================================================================
 // == ANALYTICS LOGGING                                                       ==
 // =============================================================================

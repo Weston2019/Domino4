@@ -453,6 +453,9 @@ function setupLobby() {
     
     nameInput.focus(); 
     
+    // Setup suggestion box functionality
+    setupSuggestionBox();
+    
     // Handle avatar selection from grid
     avatarOptions.forEach(option => {
         option.addEventListener('click', () => {
@@ -686,6 +689,126 @@ function setupLobby() {
         if (currentName.length >= 2 && customAvatarData) {
             saveAvatarAsFile(currentName, customAvatarData);
         }
+    });
+}
+
+/**
+ * Sets up the suggestion box functionality in the lobby.
+ */
+function setupSuggestionBox() {
+    const toggleBtn = document.getElementById('toggle-suggestion-btn');
+    const suggestionBox = document.getElementById('suggestion-box');
+    const suggestionText = document.getElementById('suggestion-text');
+    const submitBtn = document.getElementById('submit-suggestion-btn');
+    const cancelBtn = document.getElementById('cancel-suggestion-btn');
+    const statusDiv = document.getElementById('suggestion-status');
+    
+    if (!toggleBtn || !suggestionBox || !suggestionText || !submitBtn || !cancelBtn || !statusDiv) {
+        console.warn('Suggestion box elements not found');
+        return;
+    }
+    
+    // Toggle suggestion box visibility
+    toggleBtn.addEventListener('click', () => {
+        const isHidden = suggestionBox.classList.contains('hidden');
+        if (isHidden) {
+            suggestionBox.classList.remove('hidden');
+            suggestionText.focus();
+            toggleBtn.textContent = '🔙 Cerrar Sugerencias';
+        } else {
+            suggestionBox.classList.add('hidden');
+            toggleBtn.textContent = '💡 Buzón de Sugerencias';
+            // Clear form when closing
+            suggestionText.value = '';
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+        }
+    });
+    
+    // Cancel button
+    cancelBtn.addEventListener('click', () => {
+        suggestionBox.classList.add('hidden');
+        toggleBtn.textContent = '💡 Buzón de Sugerencias';
+        suggestionText.value = '';
+        statusDiv.textContent = '';
+        statusDiv.className = '';
+    });
+    
+    // Submit suggestion
+    submitBtn.addEventListener('click', async () => {
+        const suggestion = suggestionText.value.trim();
+        
+        if (!suggestion) {
+            statusDiv.textContent = '⚠️ Por favor escribe una sugerencia';
+            statusDiv.className = 'error';
+            return;
+        }
+        
+        if (suggestion.length < 10) {
+            statusDiv.textContent = '⚠️ La sugerencia debe tener al menos 10 caracteres';
+            statusDiv.className = 'error';
+            return;
+        }
+        
+        // Disable submit button and show loading
+        submitBtn.disabled = true;
+        statusDiv.textContent = '📤 Enviando sugerencia...';
+        statusDiv.className = 'loading';
+        
+        try {
+            const response = await fetch('/submit-suggestion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    suggestion: suggestion,
+                    timestamp: new Date().toISOString(),
+                    userAgent: navigator.userAgent,
+                    language: navigator.language
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                statusDiv.textContent = '✅ ¡Sugerencia enviada! Gracias por tu ayuda';
+                statusDiv.className = 'success';
+                suggestionText.value = '';
+                
+                // Auto-close after 3 seconds
+                setTimeout(() => {
+                    suggestionBox.classList.add('hidden');
+                    toggleBtn.textContent = '💡 Buzón de Sugerencias';
+                    statusDiv.textContent = '';
+                    statusDiv.className = '';
+                }, 3000);
+            } else {
+                statusDiv.textContent = '❌ Error al enviar. Inténtalo más tarde';
+                statusDiv.className = 'error';
+            }
+        } catch (error) {
+            console.error('Error submitting suggestion:', error);
+            statusDiv.textContent = '❌ Error de conexión. Inténtalo más tarde';
+            statusDiv.className = 'error';
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+    
+    // Handle Enter key in textarea (Shift+Enter for new line, Enter to submit)
+    suggestionText.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submitBtn.click();
+        }
+    });
+    
+    // Character counter
+    suggestionText.addEventListener('input', () => {
+        const remaining = 500 - suggestionText.value.length;
+        const placeholder = suggestionText.getAttribute('placeholder').split('(')[0].trim();
+        suggestionText.setAttribute('placeholder', `${placeholder} (${remaining} caracteres restantes)`);
     });
 }
 

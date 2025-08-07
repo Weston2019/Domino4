@@ -667,6 +667,161 @@ html, body {
     text-align: center;
 }
 
+/* ================================================================== */
+/* --- SUGGESTION BOX --- */
+/* ================================================================== */
+
+#suggestion-box-container {
+    position: absolute;
+    left: 20px;
+    top: 60%;
+    transform: translateY(-50%);
+    z-index: 15;
+    width: 280px;
+}
+
+#toggle-suggestion-btn {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+    width: 100%;
+}
+
+#toggle-suggestion-btn:hover {
+    background: linear-gradient(135deg, #218838, #1e7e6b);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+#suggestion-box {
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #28a745;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    transition: all 0.3s ease;
+}
+
+#suggestion-box.hidden {
+    display: none;
+}
+
+#suggestion-box h4 {
+    color: #28a745;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    text-align: center;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+#suggestion-text {
+    width: 100%;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+    color: #333;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+#suggestion-text:focus {
+    border-color: #20c997;
+    box-shadow: 0 0 8px rgba(32, 201, 151, 0.4);
+}
+
+#suggestion-text::placeholder {
+    color: #666;
+    font-style: italic;
+}
+
+#suggestion-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+#submit-suggestion-btn {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#submit-suggestion-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-1px);
+}
+
+#submit-suggestion-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+#cancel-suggestion-btn {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#cancel-suggestion-btn:hover {
+    background: linear-gradient(135deg, #5a6268, #4e555b);
+    transform: translateY(-1px);
+}
+
+#suggestion-status {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 20px;
+}
+
+#suggestion-status.success {
+    color: #28a745;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+#suggestion-status.error {
+    color: #dc3545;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+#suggestion-status.loading {
+    color: #ffc107;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ================================================================== */
+
 #matches-won-container {
     position: absolute;
     top: 100px; /* Adjust as needed */
